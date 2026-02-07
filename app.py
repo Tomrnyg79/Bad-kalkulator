@@ -228,6 +228,11 @@ def etasjetillegg_prosent(d):
 if "steg" not in st.session_state:
     st.session_state.steg = 1
 
+# Gjenopprett lagrede verdier slik at widgets beholder verdier ved tilbake-navigering
+for _k in list(st.session_state.keys()):
+    if _k.startswith("_") and not _k.startswith("__") and _k[1:] not in st.session_state:
+        st.session_state[_k[1:]] = st.session_state[_k]
+
 STEG = ["Prosjekt", "Rommål", "Romdetaljer", "Tjeneste", "Oppsummering"]
 
 # ---------------------------------------------------------------------------
