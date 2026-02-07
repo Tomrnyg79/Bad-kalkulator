@@ -151,6 +151,15 @@ def beregn_flisarbeider(d):
         else:
             poster.append(p("Cisternekasse m/list", cist, "stk", FLIS["cisternekasse_list"]))
 
+    # Silikonering: innvendige hjørner (høyde per stk) + overgang gulv/vegg (løpemeter)
+    innv = d.get("innvendige_hjorner", 4)
+    hoyde = d.get("hoyde", 2.4)
+    sil_hjorner = round(innv * hoyde, 2)
+    sil_gulv_vegg = lm
+    sil_total_lm = round(sil_hjorner + sil_gulv_vegg, 2)
+    if sil_total_lm > 0:
+        poster.append(p("Silikonering", sil_total_lm, "lm", FLIS["silikonering"]))
+
     poster.append(p("Dokumentasjon", 1, "bad", FLIS["dokumentasjon"]))
 
     epoxy = EPOXY_VALG.get(d.get("epoxy_valg", "Ikke inkludert"), 0)
