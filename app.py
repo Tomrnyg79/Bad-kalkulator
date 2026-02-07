@@ -700,6 +700,39 @@ elif st.session_state.steg == 5:
     if not har_smtp:
         st.warning("E-post er ikke konfigurert. Legg til SMTP-innstillinger i .streamlit/secrets.toml")
     else:
+        # Hurtigknapper
+        st.markdown("**Hurtigsending:**")
+        k_chr, k_mar = st.columns(2)
+        with k_chr:
+            send_christian = st.button("Send til Christian", use_container_width=True)
+        with k_mar:
+            send_mariann = st.button("Send til Mari-ann", use_container_width=True)
+
+        if send_christian or send_mariann:
+            hurtig_mottaker = "christian@sostreneamundsen.no" if send_christian else "ma@sostreneamundsen.no"
+            hurtig_navn = "Christian" if send_christian else "Mari-ann"
+            try:
+                smtp_config = {
+                    "host": st.secrets["smtp"]["host"],
+                    "port": int(st.secrets["smtp"]["port"]),
+                    "bruker": st.secrets["smtp"]["bruker"],
+                    "passord": st.secrets["smtp"]["passord"],
+                }
+                emne = f"Baderoms kalkyle – {d.get('adresse', '')}"
+                brodtekst = (
+                    f"Hei,\n\n"
+                    f"Vedlagt finner du baderoms kalkyle for {d.get('adresse', '')}.\n"
+                    f"Total inkl. mva: {fmt(total_inkl)} kr\n\n"
+                    f"Med vennlig hilsen\n{FIRMA['navn']}\n{FIRMA['telefon']}\n{FIRMA['epost']}"
+                )
+                vedlegg_liste = [(f"{filnavn}.pdf", generer_pdf(eksport_data), "application/pdf")]
+                send_epost(hurtig_mottaker, emne, brodtekst, vedlegg_liste, smtp_config)
+                st.success(f"Kalkyle sendt til {hurtig_navn} ({hurtig_mottaker})!")
+            except Exception as e:
+                st.error(f"Kunne ikke sende: {e}")
+
+        st.divider()
+        st.markdown("**Eller send til annen mottaker:**")
         epost_mottaker = st.text_input("Mottakers e-postadresse", key="epost_mottaker",
                                         placeholder="kunde@eksempel.no")
         epost_kopi = st.text_input("Kopi til (valgfritt)", key="epost_kopi",
