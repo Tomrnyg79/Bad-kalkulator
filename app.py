@@ -228,10 +228,15 @@ def etasjetillegg_prosent(d):
 if "steg" not in st.session_state:
     st.session_state.steg = 1
 
-# Gjenopprett lagrede verdier slik at widgets beholder verdier ved tilbake-navigering
+# Gjenopprett lagrede verdier for widgetfrie nøkler (navigering tilbake)
+# Widgets med key= håndterer sine egne verdier, så vi gjenoppretter kun
+# nøkler som ikke har en tilhørende widget på gjeldende steg.
+_WIDGET_FRIE = {"antall_vegger", "lopemeter", "veggareal", "flisomfang", "hjorne_behandling"}
 for _k in list(st.session_state.keys()):
-    if _k.startswith("_") and not _k.startswith("__") and _k[1:] not in st.session_state:
-        st.session_state[_k[1:]] = st.session_state[_k]
+    if _k.startswith("_") and not _k.startswith("__"):
+        _navn = _k[1:]
+        if _navn in _WIDGET_FRIE and _navn not in st.session_state:
+            st.session_state[_navn] = st.session_state[_k]
 
 STEG = ["Prosjekt", "Rommål", "Romdetaljer", "Tjeneste", "Oppsummering"]
 
@@ -265,7 +270,9 @@ if st.session_state.steg == 1:
     st.radio("Bygningstype", ["Enebolig", "Blokk / Leilighet"], horizontal=True, key="bygningstype")
 
     if st.session_state.get("bygningstype") == "Blokk / Leilighet":
-        st.number_input("Etasje", min_value=1, max_value=20, value=1, step=1, key="etasje")
+        if "etasje" not in st.session_state:
+            st.session_state.etasje = 1
+        st.number_input("Etasje", min_value=1, max_value=20, step=1, key="etasje")
         if st.session_state.get("etasje", 1) >= 2:
             st.radio("Er det heis i bygget?", ["Ja", "Nei"], horizontal=True, key="heis_valg")
             if st.session_state.get("heis_valg") == "Nei":
@@ -297,7 +304,9 @@ elif st.session_state.steg == 2:
     st.subheader("Rommål")
 
     # Takhøyde
-    st.number_input("Takhøyde (m)", 1.0, 10.0, 2.4, 0.1, "%.2f", key="hoyde")
+    if "hoyde" not in st.session_state:
+        st.session_state.hoyde = 2.4
+    st.number_input("Takhøyde (m)", 1.0, 10.0, step=0.1, format="%.2f", key="hoyde")
 
     # Dynamiske vegger
     if "antall_vegger" not in st.session_state:
@@ -305,9 +314,11 @@ elif st.session_state.steg == 2:
 
     st.markdown("#### Vegglengder")
     for i in range(st.session_state.antall_vegger):
+        if f"vegg_{i}" not in st.session_state:
+            st.session_state[f"vegg_{i}"] = 2.0
         st.number_input(
-            f"Vegg {i + 1} (m)", 0.0, 50.0, 2.0 if i < st.session_state.antall_vegger else 0.0,
-            0.1, "%.2f", key=f"vegg_{i}",
+            f"Vegg {i + 1} (m)", 0.0, 50.0,
+            step=0.1, format="%.2f", key=f"vegg_{i}",
         )
 
     k_pluss, k_minus, _ = st.columns([1, 1, 2])
@@ -333,7 +344,9 @@ elif st.session_state.steg == 2:
     st.session_state["veggareal"] = veggareal
 
     st.divider()
-    st.number_input("Gulvareal (m²)", 0.1, 200.0, 5.0, 0.1, "%.2f", key="gulvareal",
+    if "gulvareal" not in st.session_state:
+        st.session_state.gulvareal = 5.0
+    st.number_input("Gulvareal (m²)", 0.1, 200.0, step=0.1, format="%.2f", key="gulvareal",
                      help="Mål opp gulvarealet i rommet. For uregelmessige rom: del opp i rektangler og summer.")
 
     st.info(f"**Løpemeter vegg:** {lopemeter} m  |  **Veggareal:** {veggareal} m²  |  **Gulvareal:** {st.session_state['gulvareal']} m²")
@@ -372,25 +385,33 @@ elif st.session_state.steg == 3:
     flis_str = ["20x20", "30x30", "60x60", "60x120"]
     k1, k2 = st.columns(2)
     with k1:
-        st.selectbox("Flisstørrelse gulv", flis_str, index=2, key="flis_str_gulv")
+        if "flis_str_gulv" not in st.session_state:
+            st.session_state.flis_str_gulv = "60x60"
+        st.selectbox("Flisstørrelse gulv", flis_str, key="flis_str_gulv")
     with k2:
         if flisomfang == "Vegg og gulv":
-            st.selectbox("Flisstørrelse vegg", flis_str, index=2, key="flis_str_vegg")
+            if "flis_str_vegg" not in st.session_state:
+                st.session_state.flis_str_vegg = "60x60"
+            st.selectbox("Flisstørrelse vegg", flis_str, key="flis_str_vegg")
         else:
             st.markdown("&nbsp;\n\n*Sokkelflis på vegger*")
 
     if flisomfang == "Kun gulv":
-        st.checkbox("Finer bak gips på vegg", value=False, key="finer_bak_gips")
+        st.checkbox("Finer bak gips på vegg", key="finer_bak_gips")
 
     st.radio("Membran gulv", ["Smøremembran", "Banemembran (ikke inkl. i pris)"], horizontal=True, key="membran_gulv_type")
 
-    st.number_input("Areal dusjgulv (m²)", 0.0, 20.0, 1.0, 0.1, "%.1f", key="areal_dusjgulv")
+    if "areal_dusjgulv" not in st.session_state:
+        st.session_state.areal_dusjgulv = 1.0
+    st.number_input("Areal dusjgulv (m²)", 0.0, 20.0, step=0.1, format="%.1f", key="areal_dusjgulv")
 
     st.divider()
 
     # --- Sanitær ---
     st.markdown("#### Sanitær")
-    st.number_input("Antall sluk", 0, 10, 1, 1, key="antall_sluk")
+    if "antall_sluk" not in st.session_state:
+        st.session_state.antall_sluk = 1
+    st.number_input("Antall sluk", 0, 10, step=1, key="antall_sluk")
     if st.session_state.get("antall_sluk", 1) > 1:
         ekstra = st.session_state["antall_sluk"] - 1
         st.caption(f"Tillegg {fmt(ekstra * FLIS['ekstra_sluk'])} kr for {ekstra} ekstra sluk")
@@ -401,9 +422,13 @@ elif st.session_state.steg == 3:
     st.markdown("#### Hjørner")
     k1, k2 = st.columns(2)
     with k1:
-        st.number_input("Innvendige hjørner", 0, 30, 4, 1, key="innvendige_hjorner")
+        if "innvendige_hjorner" not in st.session_state:
+            st.session_state.innvendige_hjorner = 4
+        st.number_input("Innvendige hjørner", 0, 30, step=1, key="innvendige_hjorner")
     with k2:
-        st.number_input("Utvendige hjørner", 0, 30, 0, 1, key="utvendige_hjorner")
+        if "utvendige_hjorner" not in st.session_state:
+            st.session_state.utvendige_hjorner = 0
+        st.number_input("Utvendige hjørner", 0, 30, step=1, key="utvendige_hjorner")
 
     if st.session_state.get("utvendige_hjorner", 0) > 0:
         st.radio(
@@ -421,11 +446,11 @@ elif st.session_state.steg == 3:
     st.markdown("#### Isolering og påforing")
     k1, k2, k3 = st.columns(3)
     with k1:
-        st.checkbox("Isolering vegg", value=False, key="isolering_vegg")
+        st.checkbox("Isolering vegg", key="isolering_vegg")
     with k2:
-        st.checkbox("Isolering tak", value=False, key="isolering_tak")
+        st.checkbox("Isolering tak", key="isolering_tak")
     with k3:
-        st.checkbox("Påforing / lekting vegg", value=False, key="paforing_vegg")
+        st.checkbox("Påforing / lekting vegg", key="paforing_vegg")
 
     st.divider()
 
@@ -433,9 +458,13 @@ elif st.session_state.steg == 3:
     st.markdown("#### Dører")
     k1, k2 = st.columns(2)
     with k1:
-        st.number_input("Innerdører", 0, 10, 1, 1, key="antall_innerdorer")
+        if "antall_innerdorer" not in st.session_state:
+            st.session_state.antall_innerdorer = 1
+        st.number_input("Innerdører", 0, 10, step=1, key="antall_innerdorer")
     with k2:
-        st.number_input("Skyvedører", 0, 10, 0, 1, key="antall_skyvedorer")
+        if "antall_skyvedorer" not in st.session_state:
+            st.session_state.antall_skyvedorer = 0
+        st.number_input("Skyvedører", 0, 10, step=1, key="antall_skyvedorer")
 
     st.divider()
 
@@ -443,9 +472,13 @@ elif st.session_state.steg == 3:
     st.markdown("#### Nisjer og annet")
     k1, k2 = st.columns(2)
     with k1:
-        st.number_input("Antall nisjer", 0, 20, 0, 1, key="antall_nisjer")
+        if "antall_nisjer" not in st.session_state:
+            st.session_state.antall_nisjer = 0
+        st.number_input("Antall nisjer", 0, 20, step=1, key="antall_nisjer")
     with k2:
-        st.number_input("Antall cisternekasser", 0, 10, 0, 1, key="antall_cisternekasser")
+        if "antall_cisternekasser" not in st.session_state:
+            st.session_state.antall_cisternekasser = 0
+        st.number_input("Antall cisternekasser", 0, 10, step=1, key="antall_cisternekasser")
 
     if st.session_state.get("antall_nisjer", 0) > 0:
         st.radio(
@@ -465,7 +498,9 @@ elif st.session_state.steg == 3:
 
     # --- Epoxy ---
     st.markdown("#### Epoxyfug")
-    st.selectbox("Epoxyfug", list(EPOXY_VALG.keys()), index=0, key="epoxy_valg")
+    if "epoxy_valg" not in st.session_state:
+        st.session_state.epoxy_valg = "Ikke inkludert"
+    st.selectbox("Epoxyfug", list(EPOXY_VALG.keys()), key="epoxy_valg")
 
     # --- Nav ---
     st.divider()
@@ -499,10 +534,11 @@ elif st.session_state.steg == 3:
 elif st.session_state.steg == 4:
     st.subheader("Velg tjeneste")
 
+    if "tjeneste" not in st.session_state:
+        st.session_state.tjeneste = "Flisarbeider + tømrerarbeider"
     st.radio(
         "Hva ønsker du pris for?",
         ["Kun flisarbeider", "Kun tømrerarbeider", "Flisarbeider + tømrerarbeider"],
-        index=2,
         key="tjeneste",
     )
 
