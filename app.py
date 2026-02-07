@@ -162,10 +162,12 @@ STEG = ["Prosjekt", "Rommål", "Romdetaljer", "Tjeneste", "Oppsummering"]
 # ---------------------------------------------------------------------------
 # Header
 # ---------------------------------------------------------------------------
-st.markdown(
-    "<h1 style='text-align:center; font-size:2.8em; margin-bottom:0'>Nygård Bad AS</h1>",
-    unsafe_allow_html=True,
-)
+import pathlib
+_logo = pathlib.Path(__file__).parent / "unnamed.jpg"
+if _logo.exists():
+    col1, col2, col3 = st.columns([1, 1, 1])
+    with col2:
+        st.image(str(_logo), use_container_width=True)
 st.markdown(
     "<h2 style='text-align:center; color:#555; margin-top:0'>Baderoms kalkyle</h2>",
     unsafe_allow_html=True,

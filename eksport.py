@@ -15,7 +15,10 @@ from fpdf import FPDF
 from openpyxl import Workbook
 from openpyxl.styles import Font, Alignment, Border, Side, PatternFill
 
+import pathlib
 from priser import FIRMA, MVA_SATS
+
+_LOGO = pathlib.Path(__file__).parent / "unnamed.jpg"
 
 
 def fmt(tall):
@@ -69,12 +72,22 @@ def generer_pdf(data):
     pdf.add_page()
     pdf.set_auto_page_break(auto=True, margin=15)
 
-    # Firmaheader
+    # Firmaheader med logo
+    if _LOGO.exists():
+        pdf.image(str(_LOGO), x=10, y=10, w=50)
+        pdf.set_y(10)
+        pdf.cell(55)  # hopp forbi logoen
     pdf.set_font("Helvetica", "B", 20)
     pdf.cell(0, 10, FIRMA["navn"], new_x="LMARGIN", new_y="NEXT")
+    if _LOGO.exists():
+        pdf.set_x(65)
     pdf.set_font("Helvetica", "", 9)
     pdf.cell(0, 4, f"Org.nr: {FIRMA['orgnr']}  |  Tlf: {FIRMA['telefon']}", new_x="LMARGIN", new_y="NEXT")
+    if _LOGO.exists():
+        pdf.set_x(65)
     pdf.cell(0, 4, f"{FIRMA['adresse']}  |  {FIRMA['epost']}", new_x="LMARGIN", new_y="NEXT")
+    if _LOGO.exists():
+        pdf.set_y(max(pdf.get_y(), 40))  # sørg for plass under logoen
 
     pdf.ln(3)
     pdf.set_draw_color(180, 180, 180)
