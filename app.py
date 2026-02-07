@@ -27,6 +27,7 @@ def p(navn, mengde, enhet, enhetspris):
 
 def beregn_flisarbeider(d):
     poster = []
+    poster.append(p("Rigg/oppstart", 1, "stk", FLIS["rigg_oppstart"]))
     gulv = d.get("gulvareal", 0)
     vegg = d.get("veggareal", 0)
     lm = d.get("lopemeter", 0)
@@ -83,6 +84,7 @@ def beregn_flisarbeider(d):
 
 def beregn_tomrerarbeid(d):
     poster = []
+    poster.append(p("Rigg/oppstart", 1, "stk", TOMRER["rigg_oppstart"]))
     gulv = d.get("gulvareal", 0)
     vegg = d.get("veggareal", 0)
 
