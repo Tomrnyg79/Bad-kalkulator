@@ -291,31 +291,47 @@ if st.session_state.steg == 1:
 elif st.session_state.steg == 2:
     st.subheader("Rommål")
 
-    k1, k2, k3 = st.columns(3)
-    with k1:
-        st.number_input("Bredde (m)", 0.1, 50.0, 2.0, 0.1, "%.2f", key="bredde")
-    with k2:
-        st.number_input("Lengde (m)", 0.1, 50.0, 2.5, 0.1, "%.2f", key="lengde")
-    with k3:
-        st.number_input("Høyde (m)", 1.0, 10.0, 2.4, 0.1, "%.2f", key="hoyde")
+    # Takhøyde
+    st.number_input("Takhøyde (m)", 1.0, 10.0, 2.4, 0.1, "%.2f", key="hoyde")
 
-    b = st.session_state["bredde"]
-    l = st.session_state["lengde"]
+    # Dynamiske vegger
+    if "antall_vegger" not in st.session_state:
+        st.session_state.antall_vegger = 4
+
+    st.markdown("#### Vegglengder")
+    for i in range(st.session_state.antall_vegger):
+        st.number_input(
+            f"Vegg {i + 1} (m)", 0.0, 50.0, 2.0 if i < st.session_state.antall_vegger else 0.0,
+            0.1, "%.2f", key=f"vegg_{i}",
+        )
+
+    k_pluss, k_minus, _ = st.columns([1, 1, 2])
+    with k_pluss:
+        if st.button("+ Legg til vegg", use_container_width=True):
+            st.session_state.antall_vegger += 1
+            st.rerun()
+    with k_minus:
+        if st.session_state.antall_vegger > 3:
+            if st.button("- Fjern siste vegg", use_container_width=True):
+                # Fjern nøkkelen for siste vegg
+                siste = f"vegg_{st.session_state.antall_vegger - 1}"
+                if siste in st.session_state:
+                    del st.session_state[siste]
+                st.session_state.antall_vegger -= 1
+                st.rerun()
+
     h = st.session_state["hoyde"]
-    std_lm = round((b + l) * 2, 2)
+    lopemeter = round(sum(st.session_state.get(f"vegg_{i}", 0) for i in range(st.session_state.antall_vegger)), 2)
+    veggareal = round(lopemeter * h, 2)
 
-    st.number_input(
-        "Løpemeter vegg", 0.1, 200.0, std_lm, 0.1, "%.2f", key="lopemeter",
-        help="Rektangulært rom = (bredde + lengde) × 2. Juster for uregelmessige rom.",
-    )
-
-    lm = st.session_state["lopemeter"]
-    gulvareal = round(b * l, 2)
-    veggareal = round(lm * h, 2)
-    st.session_state["gulvareal"] = gulvareal
+    st.session_state["lopemeter"] = lopemeter
     st.session_state["veggareal"] = veggareal
 
-    st.info(f"**Gulvareal:** {gulvareal} m²  |  **Veggareal:** {veggareal} m²")
+    st.divider()
+    st.number_input("Gulvareal (m²)", 0.1, 200.0, 5.0, 0.1, "%.2f", key="gulvareal",
+                     help="Mål opp gulvarealet i rommet. For uregelmessige rom: del opp i rektangler og summer.")
+
+    st.info(f"**Løpemeter vegg:** {lopemeter} m  |  **Veggareal:** {veggareal} m²  |  **Gulvareal:** {st.session_state['gulvareal']} m²")
 
     kol_v, kol_h = st.columns(2)
     with kol_v:
@@ -325,7 +341,11 @@ elif st.session_state.steg == 2:
     with kol_h:
         if st.button("Neste →", use_container_width=True, type="primary"):
             # Lagre steg 2-verdier eksplisitt
-            for nk in ["bredde", "lengde", "hoyde", "lopemeter", "gulvareal", "veggareal"]:
+            vegger = {f"vegg_{i}": st.session_state.get(f"vegg_{i}", 0) for i in range(st.session_state.antall_vegger)}
+            for nk, val in vegger.items():
+                st.session_state[f"_{nk}"] = val
+            st.session_state["_antall_vegger"] = st.session_state.antall_vegger
+            for nk in ["hoyde", "lopemeter", "gulvareal", "veggareal"]:
                 if nk in st.session_state:
                     st.session_state[f"_{nk}"] = st.session_state[nk]
             st.session_state.steg = 3
