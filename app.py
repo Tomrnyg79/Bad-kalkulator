@@ -25,12 +25,14 @@ if not st.session_state.autentisert:
         logg_inn = st.form_submit_button("Logg inn", use_container_width=True, type="primary")
 
     if logg_inn:
-        brukere = st.secrets.get("auth", {})
-        if brukernavn in brukere and brukere[brukernavn]["passord"] == passord:
-            st.session_state.autentisert = True
-            st.session_state.bruker = brukernavn
-            st.rerun()
-        else:
+        try:
+            if st.secrets["auth"][brukernavn]["passord"] == passord:
+                st.session_state.autentisert = True
+                st.session_state.bruker = brukernavn
+                st.rerun()
+            else:
+                st.error("Feil brukernavn eller passord.")
+        except (KeyError, TypeError):
             st.error("Feil brukernavn eller passord.")
     st.stop()
 
