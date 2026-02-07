@@ -229,6 +229,10 @@ elif st.session_state.steg == 2:
             st.rerun()
     with kol_h:
         if st.button("Neste →", use_container_width=True, type="primary"):
+            # Lagre steg 2-verdier eksplisitt
+            for nk in ["bredde", "lengde", "hoyde", "lopemeter", "gulvareal", "veggareal"]:
+                if nk in st.session_state:
+                    st.session_state[f"_{nk}"] = st.session_state[nk]
             st.session_state.steg = 3
             st.rerun()
 
@@ -331,6 +335,17 @@ elif st.session_state.steg == 3:
             st.rerun()
     with kol_h:
         if st.button("Neste →", use_container_width=True, type="primary"):
+            # Lagre alle steg 3-verdier eksplisitt så de overlever til steg 5
+            for nk in [
+                "flisomfang", "flis_str_gulv", "flis_str_vegg",
+                "areal_dusjgulv", "antall_sluk",
+                "innvendige_hjorner", "utvendige_hjorner", "hjorne_behandling",
+                "isolering_vegg", "isolering_tak",
+                "antall_innerdorer", "antall_skyvedorer",
+                "antall_nisjer", "antall_cisternekasser", "epoxy_valg",
+            ]:
+                if nk in st.session_state:
+                    st.session_state[f"_{nk}"] = st.session_state[nk]
             st.session_state.steg = 4
             st.rerun()
 
@@ -364,6 +379,10 @@ elif st.session_state.steg == 5:
     st.subheader("Oppsummering")
 
     d = dict(st.session_state)
+    # Gjenopprett lagrede verdier fra steg 1 og 3 (widget-nøkler forsvinner mellom steg)
+    for nk in list(d.keys()):
+        if nk.startswith("_") and nk[1:] not in d:
+            d[nk[1:]] = d[nk]
     tjeneste = d.get("tjeneste", "Flisarbeider + tømrerarbeider")
 
     st.markdown(f"**Prosjekt:** {d.get('adresse', '')}")
