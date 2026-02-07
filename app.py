@@ -36,7 +36,8 @@ def beregn_flisarbeider(d):
     f_vegg = FLIS["stor_flis_faktor"] if d.get("flis_str_vegg") == "60x120" else 1.0
 
     poster.append(p("Gulvstøp", gulv, "m²", FLIS["gulvstop"]))
-    poster.append(p("Membran gulv", gulv, "m²", FLIS["membran_gulv"]))
+    if "Smøremembran" in d.get("membran_gulv_type", "Smøremembran"):
+        poster.append(p("Smøremembran gulv", gulv, "m²", FLIS["membran_gulv"]))
 
     if vegg_og_gulv:
         poster.append(p("Membran vegg", vegg, "m²", FLIS["membran_vegg"]))
@@ -275,13 +276,15 @@ elif st.session_state.steg == 3:
     if flisomfang == "Kun gulv":
         st.checkbox("Finer bak gips på vegg", value=False, key="finer_bak_gips")
 
+    st.radio("Membran gulv", ["Smøremembran", "Banemembran (ikke inkl. i pris)"], horizontal=True, key="membran_gulv_type")
+
     st.number_input("Areal dusjgulv (m²)", 0.0, 20.0, 1.0, 0.1, "%.1f", key="areal_dusjgulv")
 
     st.divider()
 
     # --- Sanitær ---
     st.markdown("#### Sanitær")
-    st.number_input("Antall sluk", 1, 10, 1, 1, key="antall_sluk")
+    st.number_input("Antall sluk", 0, 10, 1, 1, key="antall_sluk")
     if st.session_state.get("antall_sluk", 1) > 1:
         ekstra = st.session_state["antall_sluk"] - 1
         st.caption(f"Tillegg {fmt(ekstra * FLIS['ekstra_sluk'])} kr for {ekstra} ekstra sluk")
@@ -356,6 +359,7 @@ elif st.session_state.steg == 3:
             # Lagre alle steg 3-verdier eksplisitt så de overlever til steg 5
             for nk in [
                 "flisomfang", "flis_str_gulv", "flis_str_vegg", "finer_bak_gips",
+                "membran_gulv_type",
                 "areal_dusjgulv", "antall_sluk",
                 "innvendige_hjorner", "utvendige_hjorner", "hjorne_behandling",
                 "isolering_vegg", "isolering_tak", "paforing_vegg",
