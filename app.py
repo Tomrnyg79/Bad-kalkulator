@@ -163,7 +163,7 @@ STEG = ["Prosjekt", "Rommål", "Romdetaljer", "Tjeneste", "Oppsummering"]
 # Header
 # ---------------------------------------------------------------------------
 st.markdown(
-    "<h1 style='text-align:center; font-size:2.8em; margin-bottom:0'>Nygård Bad</h1>",
+    "<h1 style='text-align:center; font-size:2.8em; margin-bottom:0'>Nygård Bad AS</h1>",
     unsafe_allow_html=True,
 )
 st.markdown(
