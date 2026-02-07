@@ -48,6 +48,7 @@ TOMRER = {
     "vatromsplater": 170,
     "nedforing_tak": 360,
     "gips_tak": 360,
+    "gips_vegg": 360,
     "min_tak": 2000,
     "innerdor": 2640,
     "skyvedor": 3300,

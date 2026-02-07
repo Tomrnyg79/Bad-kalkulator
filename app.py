@@ -95,8 +95,16 @@ def beregn_tomrerarbeid(d):
 
     if d.get("paforing_vegg"):
         poster.append(p("Påforing / lekting vegg", vegg, "m²", TOMRER["paforing_vegg"]))
-    poster.append(p("Montering finerplater", vegg, "m²", TOMRER["finerplater"]))
-    poster.append(p("Montering våtromsplater vegg", vegg, "m²", TOMRER["vatromsplater"]))
+
+    vegg_og_gulv = d.get("flisomfang") == "Vegg og gulv"
+    if vegg_og_gulv:
+        poster.append(p("Montering finerplater", vegg, "m²", TOMRER["finerplater"]))
+        poster.append(p("Montering våtromsplater vegg", vegg, "m²", TOMRER["vatromsplater"]))
+    else:
+        if d.get("finer_bak_gips"):
+            poster.append(p("Finer bak gips vegg", vegg, "m²", TOMRER["finerplater"]))
+        gips_vegg_total = max(vegg * TOMRER["gips_vegg"], TOMRER["min_tak"])
+        poster.append(("Gips vegg", vegg, "m²", TOMRER["gips_vegg"], round(gips_vegg_total)))
     nedforing_total = max(gulv * TOMRER["nedforing_tak"], TOMRER["min_tak"])
     poster.append(("Nedforing / lekting tak", gulv, "m²", TOMRER["nedforing_tak"], round(nedforing_total)))
     gips_total = max(gulv * TOMRER["gips_tak"], TOMRER["min_tak"])
@@ -264,6 +272,9 @@ elif st.session_state.steg == 3:
         else:
             st.markdown("&nbsp;\n\n*Sokkelflis på vegger*")
 
+    if flisomfang == "Kun gulv":
+        st.checkbox("Finer bak gips på vegg", value=False, key="finer_bak_gips")
+
     st.number_input("Areal dusjgulv (m²)", 0.0, 20.0, 1.0, 0.1, "%.1f", key="areal_dusjgulv")
 
     st.divider()
@@ -344,7 +355,7 @@ elif st.session_state.steg == 3:
         if st.button("Neste →", use_container_width=True, type="primary"):
             # Lagre alle steg 3-verdier eksplisitt så de overlever til steg 5
             for nk in [
-                "flisomfang", "flis_str_gulv", "flis_str_vegg",
+                "flisomfang", "flis_str_gulv", "flis_str_vegg", "finer_bak_gips",
                 "areal_dusjgulv", "antall_sluk",
                 "innvendige_hjorner", "utvendige_hjorner", "hjorne_behandling",
                 "isolering_vegg", "isolering_tak", "paforing_vegg",
