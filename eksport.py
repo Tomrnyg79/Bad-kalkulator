@@ -27,35 +27,39 @@ def fmt(tall):
 # ---------------------------------------------------------------------------
 
 def _pdf_seksjon(pdf, tittel, poster, kol_b):
+    """poster: liste med (navn, mengde, enhet, enhetspris, total) tupler."""
     if not poster:
         return
     pdf.set_font("Helvetica", "B", 11)
     pdf.set_text_color(0, 0, 0)
     pdf.cell(0, 8, tittel, new_x="LMARGIN", new_y="NEXT")
 
-    # Tabelloverskrift
+    overskrifter = ["Post", "Mengde", "Enhet", "Enh.pris", "Sum kr"]
     pdf.set_font("Helvetica", "B", 9)
     pdf.set_fill_color(50, 50, 50)
     pdf.set_text_color(255, 255, 255)
-    pdf.cell(kol_b[0], 7, "Post", border=1, fill=True)
-    pdf.cell(kol_b[1], 7, "Sum kr", border=1, fill=True, align="C")
+    for i, h in enumerate(overskrifter):
+        pdf.cell(kol_b[i], 7, h, border=1, fill=True, align="C")
     pdf.ln()
 
     pdf.set_text_color(0, 0, 0)
     pdf.set_font("Helvetica", "", 9)
     skravur = False
-    for navn, total in poster:
+    for navn, mengde, enhet, enhetspris, total in poster:
         pdf.set_fill_color(245, 245, 245) if skravur else pdf.set_fill_color(255, 255, 255)
         pdf.cell(kol_b[0], 6, navn, border=1, fill=True)
-        pdf.cell(kol_b[1], 6, fmt(total), border=1, fill=True, align="R")
+        pdf.cell(kol_b[1], 6, f"{mengde:.2f}", border=1, fill=True, align="R")
+        pdf.cell(kol_b[2], 6, enhet, border=1, fill=True, align="C")
+        pdf.cell(kol_b[3], 6, fmt(enhetspris), border=1, fill=True, align="R")
+        pdf.cell(kol_b[4], 6, fmt(total), border=1, fill=True, align="R")
         pdf.ln()
         skravur = not skravur
 
-    seksjon_sum = sum(t for _, t in poster)
+    seksjon_sum = sum(t for _, _, _, _, t in poster)
     pdf.set_font("Helvetica", "B", 9)
     pdf.set_fill_color(230, 230, 230)
-    pdf.cell(kol_b[0], 7, f"Sum {tittel.lower()}", border=1, fill=True)
-    pdf.cell(kol_b[1], 7, fmt(seksjon_sum), border=1, fill=True, align="R")
+    pdf.cell(kol_b[0] + kol_b[1] + kol_b[2] + kol_b[3], 7, f"Sum {tittel.lower()}", border=1, fill=True)
+    pdf.cell(kol_b[4], 7, fmt(seksjon_sum), border=1, fill=True, align="R")
     pdf.ln()
     pdf.ln(4)
 
@@ -97,7 +101,7 @@ def generer_pdf(data):
 
     pdf.ln(6)
 
-    kol_b = [145, 45]
+    kol_b = [80, 22, 18, 32, 38]  # Post, Mengde, Enhet, Enh.pris, Sum = 190
 
     # Flisarbeider
     _pdf_seksjon(pdf, "Flisarbeider", data.get("flis_poster", []), kol_b)
@@ -113,40 +117,40 @@ def generer_pdf(data):
     mva = data.get("mva", 0)
     total_inkl = data.get("total_inkl", 0)
 
-    x = kol_b[0] + 10 - 70
-    label_w = 70
-    val_w = 45
+    tom_b = sum(kol_b[:3])  # tomrom foran totaler
+    label_w = kol_b[3]
+    val_w = kol_b[4]
 
     pdf.set_font("Helvetica", "", 10)
 
     if tillegg_pst > 0:
         arbeid = subtotal - etasje_tillegg
-        pdf.cell(kol_b[0], 6, "")
+        pdf.cell(tom_b, 6, "")
         pdf.cell(label_w, 6, "Sum arbeid:", align="R")
         pdf.cell(val_w, 6, f"{fmt(arbeid)} kr", align="R")
         pdf.ln()
-        pdf.cell(kol_b[0], 6, "")
+        pdf.cell(tom_b, 6, "")
         etasje = data.get("etasje", 1)
-        pdf.cell(label_w, 6, f"Tillegg {tillegg_pst}% ({etasje}. etg, uten heis):", align="R")
+        pdf.cell(label_w, 6, f"Tillegg {tillegg_pst}%:", align="R")
         pdf.cell(val_w, 6, f"{fmt(etasje_tillegg)} kr", align="R")
         pdf.ln()
 
-    pdf.cell(kol_b[0], 6, "")
+    pdf.cell(tom_b, 6, "")
     pdf.cell(label_w, 6, "Sum eks. mva:", align="R")
     pdf.cell(val_w, 6, f"{fmt(subtotal)} kr", align="R")
     pdf.ln()
 
-    pdf.cell(kol_b[0], 6, "")
+    pdf.cell(tom_b, 6, "")
     pdf.cell(label_w, 6, "MVA 25%:", align="R")
     pdf.cell(val_w, 6, f"{fmt(mva)} kr", align="R")
     pdf.ln()
 
     pdf.set_draw_color(0, 0, 0)
-    pdf.line(10 + kol_b[0], pdf.get_y(), 200, pdf.get_y())
+    pdf.line(10 + tom_b, pdf.get_y(), 200, pdf.get_y())
     pdf.ln(1)
 
     pdf.set_font("Helvetica", "B", 12)
-    pdf.cell(kol_b[0], 8, "")
+    pdf.cell(tom_b, 8, "")
     pdf.cell(label_w, 8, "Total inkl. mva:", align="R")
     pdf.cell(val_w, 8, f"{fmt(total_inkl)} kr", align="R")
 
@@ -158,12 +162,13 @@ def generer_pdf(data):
 # ---------------------------------------------------------------------------
 
 def _excel_seksjon(ws, rad, tittel, poster, stiler):
+    """poster: liste med (navn, mengde, enhet, enhetspris, total) tupler."""
     if not poster:
         return rad
     ws.cell(row=rad, column=1, value=tittel).font = stiler["seksjon"]
     rad += 1
 
-    for kol, h in enumerate(["Post", "Sum kr"], 1):
+    for kol, h in enumerate(["Post", "Mengde", "Enhet", "Enh.pris", "Sum kr"], 1):
         c = ws.cell(row=rad, column=kol, value=h)
         c.font = stiler["th_font"]
         c.fill = stiler["th_fill"]
@@ -171,19 +176,28 @@ def _excel_seksjon(ws, rad, tittel, poster, stiler):
         c.alignment = Alignment(horizontal="center")
     rad += 1
 
-    for navn, total in poster:
+    for navn, mengde, enhet, enhetspris, total in poster:
         ws.cell(row=rad, column=1, value=navn).border = stiler["tynn"]
-        c = ws.cell(row=rad, column=2, value=total)
+        c = ws.cell(row=rad, column=2, value=mengde)
+        c.border = stiler["tynn"]
+        c.number_format = "0.00"
+        c.alignment = Alignment(horizontal="right")
+        ws.cell(row=rad, column=3, value=enhet).border = stiler["tynn"]
+        c = ws.cell(row=rad, column=4, value=enhetspris)
+        c.border = stiler["tynn"]
+        c.number_format = "#,##0"
+        c.alignment = Alignment(horizontal="right")
+        c = ws.cell(row=rad, column=5, value=total)
         c.border = stiler["tynn"]
         c.number_format = "#,##0"
         c.alignment = Alignment(horizontal="right")
         rad += 1
 
-    seksjon_sum = sum(t for _, t in poster)
+    seksjon_sum = sum(t for _, _, _, _, t in poster)
     c1 = ws.cell(row=rad, column=1, value=f"Sum {tittel.lower()}")
     c1.font = stiler["bold"]
     c1.border = stiler["tynn"]
-    c2 = ws.cell(row=rad, column=2, value=seksjon_sum)
+    c2 = ws.cell(row=rad, column=5, value=seksjon_sum)
     c2.font = stiler["bold"]
     c2.border = stiler["tynn"]
     c2.number_format = "#,##0"
@@ -197,8 +211,11 @@ def generer_excel(data):
     ws = wb.active
     ws.title = "Kalkyle"
 
-    ws.column_dimensions["A"].width = 45
-    ws.column_dimensions["B"].width = 18
+    ws.column_dimensions["A"].width = 35
+    ws.column_dimensions["B"].width = 12
+    ws.column_dimensions["C"].width = 10
+    ws.column_dimensions["D"].width = 15
+    ws.column_dimensions["E"].width = 18
 
     stiler = {
         "header": Font(name="Calibri", bold=True, size=16),
@@ -250,35 +267,35 @@ def generer_excel(data):
     if tillegg_pst > 0:
         arbeid = subtotal - etasje_tillegg
         ws.cell(row=rad, column=1, value="Sum arbeid:").font = stiler["bold"]
-        c = ws.cell(row=rad, column=2, value=arbeid)
+        c = ws.cell(row=rad, column=5, value=arbeid)
         c.font = stiler["bold"]
         c.number_format = "#,##0"
         c.alignment = Alignment(horizontal="right")
         rad += 1
         etasje = data.get("etasje", 1)
-        ws.cell(row=rad, column=1, value=f"Tillegg {tillegg_pst}% ({etasje}. etg, uten heis):").font = stiler["normal"]
-        c = ws.cell(row=rad, column=2, value=etasje_tillegg)
+        ws.cell(row=rad, column=4, value=f"Tillegg {tillegg_pst}%:").font = stiler["normal"]
+        c = ws.cell(row=rad, column=5, value=etasje_tillegg)
         c.font = stiler["normal"]
         c.number_format = "#,##0"
         c.alignment = Alignment(horizontal="right")
         rad += 1
 
-    ws.cell(row=rad, column=1, value="Sum eks. mva:").font = stiler["bold"]
-    c = ws.cell(row=rad, column=2, value=subtotal)
+    ws.cell(row=rad, column=4, value="Sum eks. mva:").font = stiler["bold"]
+    c = ws.cell(row=rad, column=5, value=subtotal)
     c.font = stiler["bold"]
     c.number_format = "#,##0"
     c.alignment = Alignment(horizontal="right")
     rad += 1
 
-    ws.cell(row=rad, column=1, value="MVA 25%:").font = stiler["normal"]
-    c = ws.cell(row=rad, column=2, value=mva)
+    ws.cell(row=rad, column=4, value="MVA 25%:").font = stiler["normal"]
+    c = ws.cell(row=rad, column=5, value=mva)
     c.font = stiler["normal"]
     c.number_format = "#,##0"
     c.alignment = Alignment(horizontal="right")
     rad += 1
 
-    ws.cell(row=rad, column=1, value="Total inkl. mva:").font = stiler["total"]
-    c = ws.cell(row=rad, column=2, value=total_inkl)
+    ws.cell(row=rad, column=4, value="Total inkl. mva:").font = stiler["total"]
+    c = ws.cell(row=rad, column=5, value=total_inkl)
     c.font = stiler["total"]
     c.number_format = "#,##0"
     c.alignment = Alignment(horizontal="right")

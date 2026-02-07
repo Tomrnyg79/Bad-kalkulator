@@ -20,6 +20,11 @@ def trygt_filnavn(tekst):
 # Beregninger
 # ---------------------------------------------------------------------------
 
+def p(navn, mengde, enhet, enhetspris):
+    """Lag en postlinje: (navn, mengde, enhet, enhetspris, total)."""
+    return (navn, mengde, enhet, enhetspris, round(mengde * enhetspris))
+
+
 def beregn_flisarbeider(d):
     poster = []
     gulv = d.get("gulvareal", 0)
@@ -29,49 +34,49 @@ def beregn_flisarbeider(d):
     f_gulv = FLIS["stor_flis_faktor"] if d.get("flis_str_gulv") == "60x120" else 1.0
     f_vegg = FLIS["stor_flis_faktor"] if d.get("flis_str_vegg") == "60x120" else 1.0
 
-    poster.append(("Gulvstøp", round(gulv * FLIS["gulvstop"])))
-    poster.append(("Membran gulv", round(gulv * FLIS["membran_gulv"])))
+    poster.append(p("Gulvstøp", gulv, "m²", FLIS["gulvstop"]))
+    poster.append(p("Membran gulv", gulv, "m²", FLIS["membran_gulv"]))
 
     if vegg_og_gulv:
-        poster.append(("Membran vegg", round(vegg * FLIS["membran_vegg"])))
+        poster.append(p("Membran vegg", vegg, "m²", FLIS["membran_vegg"]))
 
-    poster.append((f"Flislegging gulv ({d.get('flis_str_gulv', '60x60')})",
-                    round(gulv * FLIS["flis_gulv_base"] * f_gulv)))
+    pris_gulv = FLIS["flis_gulv_base"] * f_gulv
+    poster.append(p(f"Flislegging gulv ({d.get('flis_str_gulv', '60x60')})", gulv, "m²", pris_gulv))
 
     if vegg_og_gulv:
-        poster.append((f"Flislegging vegg ({d.get('flis_str_vegg', '60x60')})",
-                        round(vegg * FLIS["flis_vegg_base"] * f_vegg)))
+        pris_vegg = FLIS["flis_vegg_base"] * f_vegg
+        poster.append(p(f"Flislegging vegg ({d.get('flis_str_vegg', '60x60')})", vegg, "m²", pris_vegg))
     else:
-        poster.append(("Sokkelflis", round(lm * FLIS["sokkelflis"])))
+        poster.append(p("Sokkelflis", lm, "lm", FLIS["sokkelflis"]))
 
     dusj = d.get("areal_dusjgulv", 1.0)
     if dusj > 0:
-        poster.append(("Flislegging dusjgulv", round(dusj * FLIS["flis_dusj"])))
+        poster.append(p("Flislegging dusjgulv", dusj, "m²", FLIS["flis_dusj"]))
 
     sluk = d.get("antall_sluk", 1)
     if sluk > 1:
-        poster.append((f"Tillegg ekstra sluk ({sluk - 1} stk)", (sluk - 1) * FLIS["ekstra_sluk"]))
+        poster.append(p("Tillegg ekstra sluk", sluk - 1, "stk", FLIS["ekstra_sluk"]))
 
     utv = d.get("utvendige_hjorner", 0)
     if utv > 0:
         if d.get("hjorne_behandling") == "Hjørnelist":
-            poster.append((f"Hjørnelist ({utv} stk)", utv * FLIS["hjornelist"]))
+            poster.append(p("Hjørnelist utv. hjørner", utv, "stk", FLIS["hjornelist"]))
         else:
-            poster.append((f"Gjæring utv. hjørner ({utv} stk)", utv * FLIS["gjaring_hjorne"]))
+            poster.append(p("Gjæring utv. hjørner", utv, "stk", FLIS["gjaring_hjorne"]))
 
     nisjer = d.get("antall_nisjer", 0)
     if nisjer > 0:
-        poster.append((f"Nisje flisarbeid ({nisjer} stk)", nisjer * FLIS["nisje_flis"]))
+        poster.append(p("Nisje flisarbeid", nisjer, "stk", FLIS["nisje_flis"]))
 
     cist = d.get("antall_cisternekasser", 0)
     if cist > 0:
-        poster.append((f"Cisternekasse ({cist} stk)", cist * FLIS["cisternekasse"]))
+        poster.append(p("Cisternekasse", cist, "stk", FLIS["cisternekasse"]))
 
-    poster.append(("Dokumentasjon", FLIS["dokumentasjon"]))
+    poster.append(p("Dokumentasjon", 1, "bad", FLIS["dokumentasjon"]))
 
     epoxy = EPOXY_VALG.get(d.get("epoxy_valg", "Ikke inkludert"), 0)
     if epoxy > 0:
-        poster.append(("Epoxyfug", epoxy))
+        poster.append(p("Epoxyfug", 1, "stk", epoxy))
 
     return poster
 
@@ -82,36 +87,36 @@ def beregn_tomrerarbeid(d):
     vegg = d.get("veggareal", 0)
 
     if d.get("isolering_vegg"):
-        poster.append(("Isolering vegg", round(vegg * TOMRER["isolering_standard"])))
+        poster.append(p("Isolering vegg", vegg, "m²", TOMRER["isolering_standard"]))
     if d.get("isolering_tak"):
-        poster.append(("Isolering tak", round(gulv * TOMRER["isolering_tak"])))
+        poster.append(p("Isolering tak", gulv, "m²", TOMRER["isolering_tak"]))
 
-    poster.append(("Påforing / lekting vegg", round(vegg * TOMRER["paforing_vegg"])))
-    poster.append(("Montering finerplater", round(vegg * TOMRER["finerplater"])))
-    poster.append(("Montering våtromsplater vegg", round(vegg * TOMRER["vatromsplater"])))
-    poster.append(("Nedforing / lekting tak", round(gulv * TOMRER["nedforing_tak"])))
-    poster.append(("Gips tak", round(gulv * TOMRER["gips_tak"])))
+    poster.append(p("Påforing / lekting vegg", vegg, "m²", TOMRER["paforing_vegg"]))
+    poster.append(p("Montering finerplater", vegg, "m²", TOMRER["finerplater"]))
+    poster.append(p("Montering våtromsplater vegg", vegg, "m²", TOMRER["vatromsplater"]))
+    poster.append(p("Nedforing / lekting tak", gulv, "m²", TOMRER["nedforing_tak"]))
+    poster.append(p("Gips tak", gulv, "m²", TOMRER["gips_tak"]))
 
     inn = d.get("antall_innerdorer", 0)
     if inn > 0:
-        poster.append((f"Innerdør komplett ({inn} stk)", inn * TOMRER["innerdor"]))
+        poster.append(p("Innerdør komplett", inn, "stk", TOMRER["innerdor"]))
 
     sky = d.get("antall_skyvedorer", 0)
     if sky > 0:
-        poster.append((f"Skyvedør komplett ({sky} stk)", sky * TOMRER["skyvedor"]))
+        poster.append(p("Skyvedør komplett", sky, "stk", TOMRER["skyvedor"]))
 
     nisjer = d.get("antall_nisjer", 0)
     if nisjer > 0:
-        poster.append((f"Nisje tømrer ({nisjer} stk)", nisjer * TOMRER["nisje"]))
+        poster.append(p("Nisje tømrer", nisjer, "stk", TOMRER["nisje"]))
 
     utv = d.get("utvendige_hjorner", 0)
     if utv > 0:
-        poster.append((f"Utvendige hjørner ({utv} stk)", utv * TOMRER["utvendig_hjorne"]))
+        poster.append(p("Utvendige hjørner", utv, "stk", TOMRER["utvendig_hjorne"]))
 
     innv = d.get("innvendige_hjorner", 4)
     if innv > 4:
         ekstra = innv - 4
-        poster.append((f"Ekstra innv. hjørner ({ekstra} stk)", ekstra * TOMRER["ekstra_innvendig_hjorne"]))
+        poster.append(p("Ekstra innv. hjørner", ekstra, "stk", TOMRER["ekstra_innvendig_hjorne"]))
 
     return poster
 
@@ -379,33 +384,48 @@ elif st.session_state.steg == 5:
     flis_poster = beregn_flisarbeider(d) if vis_flis else []
     tomrer_poster = beregn_tomrerarbeid(d) if vis_tomrer else []
 
-    if vis_flis and flis_poster:
-        st.markdown("### Flisarbeider")
-        for navn, total in flis_poster:
-            k1, k2 = st.columns([3, 1])
+    def vis_poster(tittel, poster):
+        st.markdown(f"### {tittel}")
+        k1, k2, k3, k4, k5 = st.columns([2.5, 0.7, 0.5, 0.8, 1])
+        with k1:
+            st.markdown("**Post**")
+        with k2:
+            st.markdown("**Mengde**")
+        with k3:
+            st.markdown("**Enhet**")
+        with k4:
+            st.markdown("**Enh.pris**")
+        with k5:
+            st.markdown("**Sum**")
+        for navn, mengde, enhet, enhetspris, total in poster:
+            k1, k2, k3, k4, k5 = st.columns([2.5, 0.7, 0.5, 0.8, 1])
             with k1:
                 st.markdown(navn)
             with k2:
-                st.markdown(f"**{fmt(total)} kr**")
-        sum_flis = sum(t for _, t in flis_poster)
-        st.markdown(f"**Sum flisarbeider: {fmt(sum_flis)} kr**")
+                st.markdown(f"{mengde:.2f}")
+            with k3:
+                st.markdown(enhet)
+            with k4:
+                st.markdown(f"{fmt(enhetspris)}")
+            with k5:
+                st.markdown(f"**{fmt(total)}**")
+        seksjon_sum = sum(t for _, _, _, _, t in poster)
+        st.markdown(f"**Sum {tittel.lower()}: {fmt(seksjon_sum)} kr**")
+        return seksjon_sum
+
+    sum_flis = 0
+    sum_tomrer = 0
+
+    if vis_flis and flis_poster:
+        sum_flis = vis_poster("Flisarbeider", flis_poster)
 
     if vis_flis and vis_tomrer:
         st.divider()
 
     if vis_tomrer and tomrer_poster:
-        st.markdown("### Tømrerarbeider")
-        for navn, total in tomrer_poster:
-            k1, k2 = st.columns([3, 1])
-            with k1:
-                st.markdown(navn)
-            with k2:
-                st.markdown(f"**{fmt(total)} kr**")
-        sum_tomrer = sum(t for _, t in tomrer_poster)
-        st.markdown(f"**Sum tømrerarbeider: {fmt(sum_tomrer)} kr**")
-
+        sum_tomrer = vis_poster("Tømrerarbeider", tomrer_poster)
     # Totaler
-    subtotal = sum(t for _, t in flis_poster) + sum(t for _, t in tomrer_poster)
+    subtotal = sum_flis + sum_tomrer
 
     tillegg_pst = etasjetillegg_prosent(d)
     etasje_kr = round(subtotal * tillegg_pst / 100) if tillegg_pst else 0
