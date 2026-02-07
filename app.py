@@ -197,7 +197,9 @@ if st.session_state.steg == 1:
             if not st.session_state.get("adresse", "").strip():
                 st.error("Vennligst fyll inn prosjektadressen.")
             else:
-                # Lagre etasje-info eksplisitt for beregning
+                # Lagre steg 1-verdier eksplisitt
+                st.session_state["_adresse"] = st.session_state.get("adresse", "")
+                st.session_state["_bygningstype"] = st.session_state.get("bygningstype", "Enebolig")
                 if st.session_state.get("bygningstype") == "Blokk / Leilighet":
                     st.session_state["_etasje"] = st.session_state.get("etasje", 1)
                     st.session_state["_heis"] = st.session_state.get("heis_valg", "Ja")
