@@ -22,9 +22,9 @@ def trygt_filnavn(tekst):
 
 def beregn_flisarbeider(d):
     poster = []
-    gulv = d["gulvareal"]
-    vegg = d["veggareal"]
-    lm = d["lopemeter"]
+    gulv = d.get("gulvareal", 0)
+    vegg = d.get("veggareal", 0)
+    lm = d.get("lopemeter", 0)
     vegg_og_gulv = d.get("flisomfang") == "Vegg og gulv"
     f_gulv = FLIS["stor_flis_faktor"] if d.get("flis_str_gulv") == "60x120" else 1.0
     f_vegg = FLIS["stor_flis_faktor"] if d.get("flis_str_vegg") == "60x120" else 1.0
@@ -78,8 +78,8 @@ def beregn_flisarbeider(d):
 
 def beregn_tomrerarbeid(d):
     poster = []
-    gulv = d["gulvareal"]
-    vegg = d["veggareal"]
+    gulv = d.get("gulvareal", 0)
+    vegg = d.get("veggareal", 0)
 
     if d.get("isolering_vegg"):
         poster.append(("Isolering vegg", round(vegg * TOMRER["isolering_standard"])))
