@@ -73,11 +73,11 @@ def generer_pdf(data):
     pdf.set_auto_page_break(auto=True, margin=15)
 
     # Firmaheader med logo
+    pdf.set_font("Helvetica", "B", 20)
     if _LOGO.exists():
         pdf.image(str(_LOGO), x=10, y=10, w=50)
         pdf.set_y(10)
         pdf.cell(55)  # hopp forbi logoen
-    pdf.set_font("Helvetica", "B", 20)
     pdf.cell(0, 10, FIRMA["navn"], new_x="LMARGIN", new_y="NEXT")
     if _LOGO.exists():
         pdf.set_x(65)
