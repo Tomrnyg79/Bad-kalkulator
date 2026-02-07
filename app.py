@@ -119,8 +119,8 @@ def beregn_tomrerarbeid(d):
 def etasjetillegg_prosent(d):
     if d.get("bygningstype") != "Blokk / Leilighet":
         return 0
-    etasje = d.get("etasje", 1)
-    heis = d.get("heis_valg", "Ja") == "Ja"
+    etasje = d.get("_etasje", d.get("etasje", 1))
+    heis = d.get("_heis", d.get("heis_valg", "Ja")) == "Ja"
     if etasje < 2 or heis:
         return 0
     return etasje * 5
@@ -175,6 +175,13 @@ if st.session_state.steg == 1:
             if not st.session_state.get("adresse", "").strip():
                 st.error("Vennligst fyll inn prosjektadressen.")
             else:
+                # Lagre etasje-info eksplisitt for beregning
+                if st.session_state.get("bygningstype") == "Blokk / Leilighet":
+                    st.session_state["_etasje"] = st.session_state.get("etasje", 1)
+                    st.session_state["_heis"] = st.session_state.get("heis_valg", "Ja")
+                else:
+                    st.session_state["_etasje"] = 1
+                    st.session_state["_heis"] = "Ja"
                 st.session_state.steg = 2
                 st.rerun()
 
