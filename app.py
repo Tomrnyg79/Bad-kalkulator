@@ -91,7 +91,8 @@ def beregn_tomrerarbeid(d):
     if d.get("isolering_tak"):
         poster.append(p("Isolering tak", gulv, "m²", TOMRER["isolering_tak"]))
 
-    poster.append(p("Påforing / lekting vegg", vegg, "m²", TOMRER["paforing_vegg"]))
+    if d.get("paforing_vegg"):
+        poster.append(p("Påforing / lekting vegg", vegg, "m²", TOMRER["paforing_vegg"]))
     poster.append(p("Montering finerplater", vegg, "m²", TOMRER["finerplater"]))
     poster.append(p("Montering våtromsplater vegg", vegg, "m²", TOMRER["vatromsplater"]))
     poster.append(p("Nedforing / lekting tak", gulv, "m²", TOMRER["nedforing_tak"]))
@@ -292,13 +293,15 @@ elif st.session_state.steg == 3:
 
     st.divider()
 
-    # --- Isolering ---
-    st.markdown("#### Isolering")
-    k1, k2 = st.columns(2)
+    # --- Isolering og påforing ---
+    st.markdown("#### Isolering og påforing")
+    k1, k2, k3 = st.columns(3)
     with k1:
         st.checkbox("Isolering vegg", value=False, key="isolering_vegg")
     with k2:
         st.checkbox("Isolering tak", value=False, key="isolering_tak")
+    with k3:
+        st.checkbox("Påforing / lekting vegg", value=False, key="paforing_vegg")
 
     st.divider()
 
@@ -340,7 +343,7 @@ elif st.session_state.steg == 3:
                 "flisomfang", "flis_str_gulv", "flis_str_vegg",
                 "areal_dusjgulv", "antall_sluk",
                 "innvendige_hjorner", "utvendige_hjorner", "hjorne_behandling",
-                "isolering_vegg", "isolering_tak",
+                "isolering_vegg", "isolering_tak", "paforing_vegg",
                 "antall_innerdorer", "antall_skyvedorer",
                 "antall_nisjer", "antall_cisternekasser", "epoxy_valg",
             ]:
