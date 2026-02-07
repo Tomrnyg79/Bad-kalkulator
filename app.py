@@ -97,8 +97,10 @@ def beregn_tomrerarbeid(d):
         poster.append(p("Påforing / lekting vegg", vegg, "m²", TOMRER["paforing_vegg"]))
     poster.append(p("Montering finerplater", vegg, "m²", TOMRER["finerplater"]))
     poster.append(p("Montering våtromsplater vegg", vegg, "m²", TOMRER["vatromsplater"]))
-    poster.append(p("Nedforing / lekting tak", gulv, "m²", TOMRER["nedforing_tak"]))
-    poster.append(p("Gips tak", gulv, "m²", TOMRER["gips_tak"]))
+    nedforing_total = max(gulv * TOMRER["nedforing_tak"], TOMRER["min_tak"])
+    poster.append(("Nedforing / lekting tak", gulv, "m²", TOMRER["nedforing_tak"], round(nedforing_total)))
+    gips_total = max(gulv * TOMRER["gips_tak"], TOMRER["min_tak"])
+    poster.append(("Gips tak", gulv, "m²", TOMRER["gips_tak"], round(gips_total)))
 
     inn = d.get("antall_innerdorer", 0)
     if inn > 0:
