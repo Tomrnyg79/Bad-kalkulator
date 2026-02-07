@@ -2,69 +2,181 @@ import streamlit as st
 import datetime
 import re
 
-from priser import FIRMA, MVA_SATS, FLISARBEIDER, EPOXY_VALG
-from eksport import generer_pdf, generer_excel
+from priser import FIRMA, MVA_SATS, FLIS, TOMRER, EPOXY_VALG
+from eksport import generer_pdf, generer_excel, send_epost
 
-# ---------------------------------------------------------------------------
-# Sidekonfigurasjon
-# ---------------------------------------------------------------------------
-st.set_page_config(page_title="Bad-Kalkulator | Nygård Bad", page_icon="🛁", layout="centered")
+st.set_page_config(page_title="Baderoms kalkyle | Nygård Bad", page_icon="🛁", layout="centered")
 
-# ---------------------------------------------------------------------------
-# Hjelpefunksjoner
-# ---------------------------------------------------------------------------
 
 def fmt(tall):
     return f"{tall:,.0f}".replace(",", " ")
 
 
 def trygt_filnavn(tekst):
-    return re.sub(r"[^\w\-]", "_", tekst.strip())
+    return re.sub(r"_+", "_", re.sub(r"[^\w\-]", "_", tekst.strip())).strip("_")
 
 
 # ---------------------------------------------------------------------------
-# Session-state initialisering
+# Beregninger
+# ---------------------------------------------------------------------------
+
+def beregn_flisarbeider(d):
+    poster = []
+    gulv = d["gulvareal"]
+    vegg = d["veggareal"]
+    lm = d["lopemeter"]
+    vegg_og_gulv = d.get("flisomfang") == "Vegg og gulv"
+    f_gulv = FLIS["stor_flis_faktor"] if d.get("flis_str_gulv") == "60x120" else 1.0
+    f_vegg = FLIS["stor_flis_faktor"] if d.get("flis_str_vegg") == "60x120" else 1.0
+
+    poster.append(("Gulvstøp", round(gulv * FLIS["gulvstop"])))
+    poster.append(("Membran gulv", round(gulv * FLIS["membran_gulv"])))
+
+    if vegg_og_gulv:
+        poster.append(("Membran vegg", round(vegg * FLIS["membran_vegg"])))
+
+    poster.append((f"Flislegging gulv ({d.get('flis_str_gulv', '60x60')})",
+                    round(gulv * FLIS["flis_gulv_base"] * f_gulv)))
+
+    if vegg_og_gulv:
+        poster.append((f"Flislegging vegg ({d.get('flis_str_vegg', '60x60')})",
+                        round(vegg * FLIS["flis_vegg_base"] * f_vegg)))
+    else:
+        poster.append(("Sokkelflis", round(lm * FLIS["sokkelflis"])))
+
+    dusj = d.get("areal_dusjgulv", 1.0)
+    if dusj > 0:
+        poster.append(("Flislegging dusjgulv", round(dusj * FLIS["flis_dusj"])))
+
+    sluk = d.get("antall_sluk", 1)
+    if sluk > 1:
+        poster.append((f"Tillegg ekstra sluk ({sluk - 1} stk)", (sluk - 1) * FLIS["ekstra_sluk"]))
+
+    utv = d.get("utvendige_hjorner", 0)
+    if utv > 0:
+        if d.get("hjorne_behandling") == "Hjørnelist":
+            poster.append((f"Hjørnelist ({utv} stk)", utv * FLIS["hjornelist"]))
+        else:
+            poster.append((f"Gjæring utv. hjørner ({utv} stk)", utv * FLIS["gjaring_hjorne"]))
+
+    nisjer = d.get("antall_nisjer", 0)
+    if nisjer > 0:
+        poster.append((f"Nisje flisarbeid ({nisjer} stk)", nisjer * FLIS["nisje_flis"]))
+
+    cist = d.get("antall_cisternekasser", 0)
+    if cist > 0:
+        poster.append((f"Cisternekasse ({cist} stk)", cist * FLIS["cisternekasse"]))
+
+    poster.append(("Dokumentasjon", FLIS["dokumentasjon"]))
+
+    epoxy = EPOXY_VALG.get(d.get("epoxy_valg", "Ikke inkludert"), 0)
+    if epoxy > 0:
+        poster.append(("Epoxyfug", epoxy))
+
+    return poster
+
+
+def beregn_tomrerarbeid(d):
+    poster = []
+    gulv = d["gulvareal"]
+    vegg = d["veggareal"]
+
+    if d.get("isolering_vegg"):
+        poster.append(("Isolering vegg", round(vegg * TOMRER["isolering_standard"])))
+    if d.get("isolering_tak"):
+        poster.append(("Isolering tak", round(gulv * TOMRER["isolering_tak"])))
+
+    poster.append(("Påforing / lekting vegg", round(vegg * TOMRER["paforing_vegg"])))
+    poster.append(("Montering finerplater", round(vegg * TOMRER["finerplater"])))
+    poster.append(("Montering våtromsplater vegg", round(vegg * TOMRER["vatromsplater"])))
+    poster.append(("Nedforing / lekting tak", round(gulv * TOMRER["nedforing_tak"])))
+    poster.append(("Gips tak", round(gulv * TOMRER["gips_tak"])))
+
+    inn = d.get("antall_innerdorer", 0)
+    if inn > 0:
+        poster.append((f"Innerdør komplett ({inn} stk)", inn * TOMRER["innerdor"]))
+
+    sky = d.get("antall_skyvedorer", 0)
+    if sky > 0:
+        poster.append((f"Skyvedør komplett ({sky} stk)", sky * TOMRER["skyvedor"]))
+
+    nisjer = d.get("antall_nisjer", 0)
+    if nisjer > 0:
+        poster.append((f"Nisje tømrer ({nisjer} stk)", nisjer * TOMRER["nisje"]))
+
+    utv = d.get("utvendige_hjorner", 0)
+    if utv > 0:
+        poster.append((f"Utvendige hjørner ({utv} stk)", utv * TOMRER["utvendig_hjorne"]))
+
+    innv = d.get("innvendige_hjorner", 4)
+    if innv > 4:
+        ekstra = innv - 4
+        poster.append((f"Ekstra innv. hjørner ({ekstra} stk)", ekstra * TOMRER["ekstra_innvendig_hjorne"]))
+
+    return poster
+
+
+def etasjetillegg_prosent(d):
+    if d.get("bygningstype") != "Blokk / Leilighet":
+        return 0
+    etasje = d.get("etasje", 1)
+    heis = d.get("heis_valg", "Ja") == "Ja"
+    if etasje < 2 or heis:
+        return 0
+    return etasje * 5
+
+
+# ---------------------------------------------------------------------------
+# Session state
 # ---------------------------------------------------------------------------
 if "steg" not in st.session_state:
     st.session_state.steg = 1
 
-STEG_NAVN = ["Prosjekt", "Rommål", "Tjeneste", "Detaljer", "Oppsummering"]
+STEG = ["Prosjekt", "Rommål", "Romdetaljer", "Tjeneste", "Oppsummering"]
 
 # ---------------------------------------------------------------------------
-# Header og fremdrift
+# Header
 # ---------------------------------------------------------------------------
-st.title("🛁 Bad-Kalkulator")
-st.caption(FIRMA["navn"])
-
-fremdrift = (st.session_state.steg - 1) / (len(STEG_NAVN) - 1)
-st.progress(fremdrift)
 st.markdown(
-    f"**Steg {st.session_state.steg} av {len(STEG_NAVN)}: "
-    f"{STEG_NAVN[st.session_state.steg - 1]}**"
+    "<h1 style='text-align:center; font-size:2.8em; margin-bottom:0'>Nygård Bad</h1>",
+    unsafe_allow_html=True,
 )
+st.markdown(
+    "<h2 style='text-align:center; color:#555; margin-top:0'>Baderoms kalkyle</h2>",
+    unsafe_allow_html=True,
+)
+
+fremdrift = (st.session_state.steg - 1) / (len(STEG) - 1)
+st.progress(fremdrift)
+st.markdown(f"**Steg {st.session_state.steg} av {len(STEG)}: {STEG[st.session_state.steg - 1]}**")
 st.divider()
 
 # ===================================================================
-# STEG 1 – Prosjektadresse
+# STEG 1 – Prosjekt
 # ===================================================================
 if st.session_state.steg == 1:
     st.subheader("Prosjektinformasjon")
 
-    adresse = st.text_input(
-        "Prosjektadresse",
-        value=st.session_state.get("adresse", ""),
-        placeholder="F.eks. Storgata 1, 0570 Oslo",
-    )
+    st.text_input("Prosjektadresse", placeholder="F.eks. Storgata 1, 0570 Oslo", key="adresse")
 
-    col_l, col_r = st.columns(2)
-    with col_r:
+    st.radio("Bygningstype", ["Enebolig", "Blokk / Leilighet"], horizontal=True, key="bygningstype")
+
+    if st.session_state.get("bygningstype") == "Blokk / Leilighet":
+        st.number_input("Etasje", min_value=1, max_value=20, value=1, step=1, key="etasje")
+        if st.session_state.get("etasje", 1) >= 2:
+            st.radio("Er det heis i bygget?", ["Ja", "Nei"], horizontal=True, key="heis_valg")
+            if st.session_state.get("heis_valg") == "Nei":
+                pst = st.session_state["etasje"] * 5
+                st.warning(f"Tillegg {pst}% for {st.session_state['etasje']}. etasje uten heis.")
+
+    _, kol_h = st.columns(2)
+    with kol_h:
         if st.button("Neste →", use_container_width=True, type="primary"):
-            if adresse.strip():
-                st.session_state.adresse = adresse.strip()
+            if not st.session_state.get("adresse", "").strip():
+                st.error("Vennligst fyll inn prosjektadressen.")
+            else:
                 st.session_state.steg = 2
                 st.rerun()
-            else:
-                st.error("Vennligst fyll inn prosjektadressen.")
 
 # ===================================================================
 # STEG 2 – Rommål
@@ -72,37 +184,29 @@ if st.session_state.steg == 1:
 elif st.session_state.steg == 2:
     st.subheader("Rommål")
 
-    kol1, kol2, kol3 = st.columns(3)
-    with kol1:
-        bredde = st.number_input(
-            "Bredde (m)", min_value=0.1, max_value=50.0,
-            value=st.session_state.get("bredde", 2.0),
-            step=0.1, format="%.2f",
-        )
-    with kol2:
-        lengde = st.number_input(
-            "Lengde (m)", min_value=0.1, max_value=50.0,
-            value=st.session_state.get("lengde", 2.5),
-            step=0.1, format="%.2f",
-        )
-    with kol3:
-        hoyde = st.number_input(
-            "Høyde (m)", min_value=1.0, max_value=10.0,
-            value=st.session_state.get("hoyde", 2.4),
-            step=0.1, format="%.2f",
-        )
+    k1, k2, k3 = st.columns(3)
+    with k1:
+        st.number_input("Bredde (m)", 0.1, 50.0, 2.0, 0.1, "%.2f", key="bredde")
+    with k2:
+        st.number_input("Lengde (m)", 0.1, 50.0, 2.5, 0.1, "%.2f", key="lengde")
+    with k3:
+        st.number_input("Høyde (m)", 1.0, 10.0, 2.4, 0.1, "%.2f", key="hoyde")
 
-    standard_lopemeter = round((bredde + lengde) * 2, 2)
-    lopemeter = st.number_input(
-        "Løpemeter vegg",
-        min_value=0.1, max_value=200.0,
-        value=st.session_state.get("lopemeter", standard_lopemeter),
-        step=0.1, format="%.2f",
-        help="For et rektangulært rom: (bredde + lengde) × 2. Juster for uregelmessige rom, innvendige/utvendige hjørner osv.",
+    b = st.session_state["bredde"]
+    l = st.session_state["lengde"]
+    h = st.session_state["hoyde"]
+    std_lm = round((b + l) * 2, 2)
+
+    st.number_input(
+        "Løpemeter vegg", 0.1, 200.0, std_lm, 0.1, "%.2f", key="lopemeter",
+        help="Rektangulært rom = (bredde + lengde) × 2. Juster for uregelmessige rom.",
     )
 
-    gulvareal = round(bredde * lengde, 2)
-    veggareal = round(lopemeter * hoyde, 2)
+    lm = st.session_state["lopemeter"]
+    gulvareal = round(b * l, 2)
+    veggareal = round(lm * h, 2)
+    st.session_state["gulvareal"] = gulvareal
+    st.session_state["veggareal"] = veggareal
 
     st.info(f"**Gulvareal:** {gulvareal} m²  |  **Veggareal:** {veggareal} m²")
 
@@ -113,39 +217,101 @@ elif st.session_state.steg == 2:
             st.rerun()
     with kol_h:
         if st.button("Neste →", use_container_width=True, type="primary"):
-            # Sjekk om arealene har endret seg – i så fall nullstill mengder
-            forrige_areal = st.session_state.get("_prev_areal")
-            ny_areal = (gulvareal, veggareal)
-            if forrige_areal is not None and forrige_areal != ny_areal:
-                for item in FLISARBEIDER:
-                    if item["kategori"] in ("gulv", "vegg"):
-                        nk = f"mengde_{item['id']}"
-                        if nk in st.session_state:
-                            del st.session_state[nk]
-
-            st.session_state.update(
-                bredde=bredde, lengde=lengde, hoyde=hoyde,
-                lopemeter=lopemeter, gulvareal=gulvareal,
-                veggareal=veggareal, _prev_areal=ny_areal,
-            )
             st.session_state.steg = 3
             st.rerun()
 
 # ===================================================================
-# STEG 3 – Velg tjeneste
+# STEG 3 – Romdetaljer
 # ===================================================================
 elif st.session_state.steg == 3:
-    st.subheader("Velg tjeneste")
+    st.subheader("Romdetaljer")
 
-    tjeneste = st.radio(
-        "Hva ønsker du å kalkulere?",
-        options=["Flisarbeider", "Tømrerarbeider"],
-        index=0 if st.session_state.get("tjeneste", "Flisarbeider") == "Flisarbeider" else 1,
-    )
+    # --- Flisvalg ---
+    st.markdown("#### Flisvalg")
+    st.radio("Flislegging", ["Vegg og gulv", "Kun gulv (gips på vegger)"], horizontal=True, key="flisomfang_valg")
 
-    if tjeneste == "Tømrerarbeider":
-        st.warning("Tømrerarbeider er under utvikling og ikke tilgjengelig ennå.")
+    flisomfang = "Vegg og gulv" if "Vegg og gulv" in st.session_state.get("flisomfang_valg", "") else "Kun gulv"
+    st.session_state["flisomfang"] = flisomfang
 
+    flis_str = ["20x20", "30x30", "60x60", "60x120"]
+    k1, k2 = st.columns(2)
+    with k1:
+        st.selectbox("Flisstørrelse gulv", flis_str, index=2, key="flis_str_gulv")
+    with k2:
+        if flisomfang == "Vegg og gulv":
+            st.selectbox("Flisstørrelse vegg", flis_str, index=2, key="flis_str_vegg")
+        else:
+            st.markdown("&nbsp;\n\n*Sokkelflis på vegger*")
+
+    st.number_input("Areal dusjgulv (m²)", 0.0, 20.0, 1.0, 0.1, "%.1f", key="areal_dusjgulv")
+
+    st.divider()
+
+    # --- Sanitær ---
+    st.markdown("#### Sanitær")
+    st.number_input("Antall sluk", 1, 10, 1, 1, key="antall_sluk")
+    if st.session_state.get("antall_sluk", 1) > 1:
+        ekstra = st.session_state["antall_sluk"] - 1
+        st.caption(f"Tillegg {fmt(ekstra * FLIS['ekstra_sluk'])} kr for {ekstra} ekstra sluk")
+
+    st.divider()
+
+    # --- Hjørner ---
+    st.markdown("#### Hjørner")
+    k1, k2 = st.columns(2)
+    with k1:
+        st.number_input("Innvendige hjørner", 0, 30, 4, 1, key="innvendige_hjorner")
+    with k2:
+        st.number_input("Utvendige hjørner", 0, 30, 0, 1, key="utvendige_hjorner")
+
+    if st.session_state.get("utvendige_hjorner", 0) > 0:
+        st.radio(
+            "Behandling utvendige hjørner",
+            ["Hjørnelist (1 500 kr/stk)", "Gjæring (2 000 kr/stk)"],
+            horizontal=True, key="hjorne_beh_valg",
+        )
+        st.session_state["hjorne_behandling"] = (
+            "Hjørnelist" if "Hjørnelist" in st.session_state.get("hjorne_beh_valg", "") else "Gjæring"
+        )
+
+    st.divider()
+
+    # --- Isolering ---
+    st.markdown("#### Isolering")
+    k1, k2 = st.columns(2)
+    with k1:
+        st.checkbox("Isolering vegg", value=False, key="isolering_vegg")
+    with k2:
+        st.checkbox("Isolering tak", value=False, key="isolering_tak")
+
+    st.divider()
+
+    # --- Dører ---
+    st.markdown("#### Dører")
+    k1, k2 = st.columns(2)
+    with k1:
+        st.number_input("Innerdører", 0, 10, 1, 1, key="antall_innerdorer")
+    with k2:
+        st.number_input("Skyvedører", 0, 10, 0, 1, key="antall_skyvedorer")
+
+    st.divider()
+
+    # --- Nisjer og annet ---
+    st.markdown("#### Nisjer og annet")
+    k1, k2 = st.columns(2)
+    with k1:
+        st.number_input("Antall nisjer", 0, 20, 0, 1, key="antall_nisjer")
+    with k2:
+        st.number_input("Antall cisternekasser", 0, 10, 0, 1, key="antall_cisternekasser")
+
+    st.divider()
+
+    # --- Epoxy ---
+    st.markdown("#### Epoxyfug")
+    st.selectbox("Epoxyfug", list(EPOXY_VALG.keys()), index=0, key="epoxy_valg")
+
+    # --- Nav ---
+    st.divider()
     kol_v, kol_h = st.columns(2)
     with kol_v:
         if st.button("← Tilbake", use_container_width=True):
@@ -153,219 +319,195 @@ elif st.session_state.steg == 3:
             st.rerun()
     with kol_h:
         if st.button("Neste →", use_container_width=True, type="primary"):
-            if tjeneste == "Tømrerarbeider":
-                st.error("Tømrerarbeider er ikke tilgjengelig ennå.")
-            else:
-                st.session_state.tjeneste = tjeneste
-                st.session_state.steg = 4
-                st.rerun()
+            st.session_state.steg = 4
+            st.rerun()
 
 # ===================================================================
-# STEG 4 – Flisarbeider detaljer
+# STEG 4 – Velg tjeneste
 # ===================================================================
 elif st.session_state.steg == 4:
-    st.subheader("Flisarbeider – Velg poster")
+    st.subheader("Velg tjeneste")
 
-    gulvareal = st.session_state.get("gulvareal", 0)
-    veggareal = st.session_state.get("veggareal", 0)
-
-    st.caption(f"Gulvareal: {gulvareal} m²  |  Veggareal: {veggareal} m²")
-    st.divider()
-
-    poster = []
-
-    for item in FLISARBEIDER:
-        # Bestem standard-mengde
-        if item["kategori"] == "gulv":
-            std_mengde = gulvareal
-        elif item["kategori"] == "vegg":
-            std_mengde = veggareal
-        elif item["kategori"] == "fast":
-            std_mengde = 1.0
-        else:
-            std_mengde = float(item.get("std_mengde", 1.0))
-
-        kol1, kol2, kol3 = st.columns([3, 1.2, 1.2])
-
-        with kol1:
-            inkludert = st.checkbox(
-                f"{item['navn']}  —  {fmt(item['pris'])} kr/{item['enhet']}",
-                value=st.session_state.get(f"inkl_{item['id']}", item["standard"]),
-                key=f"inkl_{item['id']}",
-            )
-
-        mengde = 0.0
-        total = 0.0
-
-        if inkludert:
-            with kol2:
-                if item["kategori"] == "fast":
-                    mengde = 1.0
-                    st.markdown(f"&nbsp;\n\n`1 {item['enhet']}`")
-                elif item["kategori"] == "stk":
-                    mengde = float(
-                        st.number_input(
-                            "Antall",
-                            min_value=0, max_value=50,
-                            value=int(st.session_state.get(f"mengde_{item['id']}", max(1, int(std_mengde)))),
-                            step=1,
-                            key=f"mengde_{item['id']}",
-                            label_visibility="collapsed",
-                        )
-                    )
-                else:
-                    mengde = st.number_input(
-                        "Mengde",
-                        min_value=0.0, max_value=500.0,
-                        value=float(st.session_state.get(f"mengde_{item['id']}", std_mengde)),
-                        step=0.1, format="%.2f",
-                        key=f"mengde_{item['id']}",
-                        label_visibility="collapsed",
-                    )
-
-            total = item["pris"] * mengde
-            with kol3:
-                st.markdown(f"&nbsp;\n\n**{fmt(total)} kr**")
-
-            poster.append({
-                "navn": item["navn"],
-                "mengde": mengde,
-                "enhet": item["enhet"],
-                "pris": item["pris"],
-                "total": total,
-            })
-
-    # --- Epoxyfug ---
-    st.divider()
-    st.markdown("**Epoxyfug (tillegg)**")
-    epoxy_valg = st.selectbox(
-        "Velg størrelse",
-        options=list(EPOXY_VALG.keys()),
-        index=list(EPOXY_VALG.keys()).index(
-            st.session_state.get("epoxy_valg", "Ikke inkludert")
-        ),
-        key="epoxy_valg_widget",
-        label_visibility="collapsed",
+    st.radio(
+        "Hva ønsker du pris for?",
+        ["Kun flisarbeider", "Kun tømrerarbeider", "Flisarbeider + tømrerarbeider"],
+        index=2,
+        key="tjeneste",
     )
 
-    epoxy_pris = EPOXY_VALG[epoxy_valg]
-    if epoxy_pris > 0:
-        st.markdown(f"Epoxyfug tillegg: **{fmt(epoxy_pris)} kr**")
-
-    # --- Forhåndsvisning av totalsum ---
-    st.divider()
-    forhåndssum = sum(p["total"] for p in poster) + epoxy_pris
-    st.markdown(f"### Foreløpig sum eks. mva: {fmt(forhåndssum)} kr")
-
-    # --- Navigasjon ---
     kol_v, kol_h = st.columns(2)
     with kol_v:
         if st.button("← Tilbake", use_container_width=True):
             st.session_state.steg = 3
             st.rerun()
     with kol_h:
-        if st.button("Neste →", use_container_width=True, type="primary"):
-            if not poster:
-                st.error("Du må velge minst én post.")
-            else:
-                st.session_state.poster = poster
-                st.session_state.epoxy_valg = epoxy_valg
-                st.session_state.epoxy_pris = epoxy_pris
-                st.session_state.steg = 5
-                st.rerun()
+        if st.button("Se kalkyle →", use_container_width=True, type="primary"):
+            st.session_state.steg = 5
+            st.rerun()
 
 # ===================================================================
-# STEG 5 – Oppsummering og eksport
+# STEG 5 – Oppsummering
 # ===================================================================
 elif st.session_state.steg == 5:
     st.subheader("Oppsummering")
 
-    adresse = st.session_state.get("adresse", "")
-    poster = st.session_state.get("poster", [])
-    epoxy_pris = st.session_state.get("epoxy_pris", 0)
-    epoxy_valg = st.session_state.get("epoxy_valg", "Ikke inkludert")
-    gulvareal = st.session_state.get("gulvareal", 0)
-    veggareal = st.session_state.get("veggareal", 0)
+    d = dict(st.session_state)
+    tjeneste = d.get("tjeneste", "Flisarbeider + tømrerarbeider")
 
-    st.markdown(f"**Prosjekt:** {adresse}")
+    st.markdown(f"**Prosjekt:** {d.get('adresse', '')}")
     st.markdown(f"**Dato:** {datetime.date.today().strftime('%d.%m.%Y')}")
-    st.markdown(f"**Gulvareal:** {gulvareal} m²  |  **Veggareal:** {veggareal} m²")
+    st.markdown(f"**Gulvareal:** {d.get('gulvareal', 0)} m²  |  **Veggareal:** {d.get('veggareal', 0)} m²")
+
+    if d.get("bygningstype") == "Blokk / Leilighet":
+        etinfo = f"Blokk/leilighet, {d.get('etasje', 1)}. etasje"
+        if d.get("etasje", 1) >= 2:
+            etinfo += f", {'heis' if d.get('heis_valg', 'Ja') == 'Ja' else 'uten heis'}"
+        st.markdown(f"**Bygning:** {etinfo}")
+
     st.divider()
 
-    # Tabell
-    if poster:
-        for post in poster:
-            if post["mengde"] > 0:
-                kol1, kol2, kol3 = st.columns([3, 1.5, 1.5])
-                with kol1:
-                    st.markdown(post["navn"])
-                with kol2:
-                    st.markdown(f"{post['mengde']:.2f} {post['enhet']}  ×  {fmt(post['pris'])} kr")
-                with kol3:
-                    st.markdown(f"**{fmt(post['total'])} kr**")
+    vis_flis = tjeneste in ("Kun flisarbeider", "Flisarbeider + tømrerarbeider")
+    vis_tomrer = tjeneste in ("Kun tømrerarbeider", "Flisarbeider + tømrerarbeider")
 
-    if epoxy_pris > 0:
-        kol1, kol2, kol3 = st.columns([3, 1.5, 1.5])
-        with kol1:
-            st.markdown("Epoxyfug")
-        with kol2:
-            st.markdown(f"1 stk  ×  {fmt(epoxy_pris)} kr")
-        with kol3:
-            st.markdown(f"**{fmt(epoxy_pris)} kr**")
+    flis_poster = beregn_flisarbeider(d) if vis_flis else []
+    tomrer_poster = beregn_tomrerarbeid(d) if vis_tomrer else []
+
+    if vis_flis and flis_poster:
+        st.markdown("### Flisarbeider")
+        for navn, total in flis_poster:
+            k1, k2 = st.columns([3, 1])
+            with k1:
+                st.markdown(navn)
+            with k2:
+                st.markdown(f"**{fmt(total)} kr**")
+        sum_flis = sum(t for _, t in flis_poster)
+        st.markdown(f"**Sum flisarbeider: {fmt(sum_flis)} kr**")
+
+    if vis_flis and vis_tomrer:
+        st.divider()
+
+    if vis_tomrer and tomrer_poster:
+        st.markdown("### Tømrerarbeider")
+        for navn, total in tomrer_poster:
+            k1, k2 = st.columns([3, 1])
+            with k1:
+                st.markdown(navn)
+            with k2:
+                st.markdown(f"**{fmt(total)} kr**")
+        sum_tomrer = sum(t for _, t in tomrer_poster)
+        st.markdown(f"**Sum tømrerarbeider: {fmt(sum_tomrer)} kr**")
 
     # Totaler
-    subtotal = sum(p["total"] for p in poster if p["mengde"] > 0) + epoxy_pris
-    mva = subtotal * MVA_SATS
-    total_inkl = subtotal + mva
+    subtotal = sum(t for _, t in flis_poster) + sum(t for _, t in tomrer_poster)
+
+    tillegg_pst = etasjetillegg_prosent(d)
+    etasje_kr = round(subtotal * tillegg_pst / 100) if tillegg_pst else 0
+    subtotal_total = subtotal + etasje_kr
+    mva = round(subtotal_total * MVA_SATS)
+    total_inkl = subtotal_total + mva
 
     st.divider()
-    kol_tom, kol_t = st.columns([2, 2])
+    _, kol_t = st.columns([2, 2])
     with kol_t:
-        st.markdown(f"**Sum eks. mva:** {fmt(subtotal)} kr")
+        if tillegg_pst > 0:
+            st.markdown(f"**Sum arbeid:** {fmt(subtotal)} kr")
+            st.markdown(
+                f"**Tillegg {tillegg_pst}% "
+                f"({d.get('etasje', 1)}. etasje, uten heis):** {fmt(etasje_kr)} kr"
+            )
+        st.markdown(f"**Sum eks. mva:** {fmt(subtotal_total)} kr")
         st.markdown(f"**MVA 25%:** {fmt(mva)} kr")
         st.markdown(f"### Total inkl. mva: {fmt(total_inkl)} kr")
 
-    # Lagre totaler for eksport
+    # Eksportdata
     eksport_data = {
-        "adresse": adresse,
-        "gulvareal": gulvareal,
-        "veggareal": veggareal,
-        "tjeneste": st.session_state.get("tjeneste", "Flisarbeider"),
-        "poster": poster,
-        "epoxy_valg": epoxy_valg,
-        "epoxy_pris": epoxy_pris,
-        "subtotal": subtotal,
+        "adresse": d.get("adresse", ""),
+        "dato": datetime.date.today().strftime("%d.%m.%Y"),
+        "gulvareal": d.get("gulvareal", 0),
+        "veggareal": d.get("veggareal", 0),
+        "bygningstype": d.get("bygningstype", "Enebolig"),
+        "etasje": d.get("etasje", 1),
+        "heis": d.get("heis_valg", "Ja") == "Ja",
+        "tjeneste": tjeneste,
+        "flis_poster": flis_poster,
+        "tomrer_poster": tomrer_poster,
+        "tillegg_pst": tillegg_pst,
+        "etasje_tillegg": etasje_kr,
+        "subtotal": subtotal_total,
         "mva": mva,
         "total_inkl": total_inkl,
     }
 
-    # --- Eksport ---
     st.divider()
     st.subheader("Eksporter kalkyle")
+    filnavn = f"kalkyle_{trygt_filnavn(d.get('adresse', 'bad'))}_{datetime.date.today()}"
 
-    filnavn_base = f"kalkyle_{trygt_filnavn(adresse)}_{datetime.date.today()}"
-
-    kol1, kol2 = st.columns(2)
-    with kol1:
-        pdf_bytes = generer_pdf(eksport_data)
+    k1, k2 = st.columns(2)
+    with k1:
         st.download_button(
-            "Last ned PDF",
-            data=pdf_bytes,
-            file_name=f"{filnavn_base}.pdf",
-            mime="application/pdf",
-            use_container_width=True,
+            "Last ned PDF", generer_pdf(eksport_data),
+            f"{filnavn}.pdf", "application/pdf", use_container_width=True,
         )
-    with kol2:
-        excel_bytes = generer_excel(eksport_data)
+    with k2:
         st.download_button(
-            "Last ned Excel",
-            data=excel_bytes,
-            file_name=f"{filnavn_base}.xlsx",
-            mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+            "Last ned Excel", generer_excel(eksport_data),
+            f"{filnavn}.xlsx",
+            "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
             use_container_width=True,
         )
 
-    # Navigasjon
+    # --- E-post ---
+    st.divider()
+    st.subheader("Send på e-post")
+
+    har_smtp = hasattr(st, "secrets") and "smtp" in st.secrets
+    if not har_smtp:
+        st.warning("E-post er ikke konfigurert. Legg til SMTP-innstillinger i .streamlit/secrets.toml")
+    else:
+        epost_mottaker = st.text_input("Mottakers e-postadresse", key="epost_mottaker",
+                                        placeholder="kunde@eksempel.no")
+        epost_kopi = st.text_input("Kopi til (valgfritt)", key="epost_kopi",
+                                    placeholder="din@epost.no")
+
+        vedlegg_valg = st.multiselect("Vedlegg", ["PDF", "Excel"], default=["PDF"], key="vedlegg_valg")
+
+        if st.button("Send kalkyle på e-post", use_container_width=True, type="primary"):
+            if not epost_mottaker or "@" not in epost_mottaker:
+                st.error("Vennligst fyll inn en gyldig e-postadresse.")
+            else:
+                try:
+                    smtp_config = {
+                        "host": st.secrets["smtp"]["host"],
+                        "port": int(st.secrets["smtp"]["port"]),
+                        "bruker": st.secrets["smtp"]["bruker"],
+                        "passord": st.secrets["smtp"]["passord"],
+                    }
+
+                    vedlegg_liste = []
+                    if "PDF" in vedlegg_valg:
+                        vedlegg_liste.append((f"{filnavn}.pdf", generer_pdf(eksport_data), "application/pdf"))
+                    if "Excel" in vedlegg_valg:
+                        vedlegg_liste.append((f"{filnavn}.xlsx", generer_excel(eksport_data),
+                                              "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"))
+
+                    emne = f"Baderoms kalkyle – {d.get('adresse', '')}"
+                    brodtekst = (
+                        f"Hei,\n\n"
+                        f"Vedlagt finner du baderoms kalkyle for {d.get('adresse', '')}.\n"
+                        f"Total inkl. mva: {fmt(total_inkl)} kr\n\n"
+                        f"Med vennlig hilsen\n{FIRMA['navn']}\n{FIRMA['telefon']}\n{FIRMA['epost']}"
+                    )
+
+                    mottakere = epost_mottaker
+                    send_epost(mottakere, emne, brodtekst, vedlegg_liste, smtp_config)
+
+                    if epost_kopi and "@" in epost_kopi:
+                        send_epost(epost_kopi, emne, brodtekst, vedlegg_liste, smtp_config)
+
+                    st.success(f"Kalkyle sendt til {epost_mottaker}!")
+                except Exception as e:
+                    st.error(f"Kunne ikke sende e-post: {e}")
+
     st.divider()
     kol_v, kol_h = st.columns(2)
     with kol_v:
