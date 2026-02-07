@@ -26,7 +26,7 @@ if not st.session_state.autentisert:
 
     if logg_inn:
         try:
-            if st.secrets["auth"][brukernavn]["passord"] == passord:
+            if st.secrets["passwords"][brukernavn] == passord:
                 st.session_state.autentisert = True
                 st.session_state.bruker = brukernavn
                 st.rerun()
