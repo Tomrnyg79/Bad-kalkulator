@@ -29,7 +29,7 @@ FLIS = {
     "nisje_flis_gjaring": 4500,
     "ekstra_sluk": 1000,
     "hjornelist": 1500,
-    "gjaring_hjorne": 2000,
+    "gjaring_hjorne": 2500,
     "stor_flis_faktor": 1.30,
     "rigg_oppstart": 3500,
 }

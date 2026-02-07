@@ -403,7 +403,7 @@ elif st.session_state.steg == 3:
     if st.session_state.get("utvendige_hjorner", 0) > 0:
         st.radio(
             "Behandling utvendige hjørner",
-            ["Hjørnelist (1 500 kr/stk)", "Gjæring (2 000 kr/stk)"],
+            ["Hjørnelist (1 500 kr/stk)", "Gjæring (2 500 kr/stk)"],
             horizontal=True, key="hjorne_beh_valg",
         )
         st.session_state["hjorne_behandling"] = (
