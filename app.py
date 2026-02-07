@@ -4,8 +4,77 @@ import re
 
 from priser import FIRMA, MVA_SATS, FLIS, TOMRER, EPOXY_VALG
 from eksport import generer_pdf, generer_excel, send_epost
+from prosjekter import lagre_prosjekt, hent_alle_prosjekter, last_prosjekt, sheets_er_konfigurert
 
 st.set_page_config(page_title="Baderoms kalkyle | Nygård Bad", page_icon="🛁", layout="centered")
+
+# ---------------------------------------------------------------------------
+# Innlogging
+# ---------------------------------------------------------------------------
+if "autentisert" not in st.session_state:
+    st.session_state.autentisert = False
+
+if not st.session_state.autentisert:
+    st.markdown(
+        "<h2 style='text-align:center; color:#555;'>Logg inn</h2>",
+        unsafe_allow_html=True,
+    )
+    with st.form("login_form"):
+        brukernavn = st.text_input("Brukernavn")
+        passord = st.text_input("Passord", type="password")
+        logg_inn = st.form_submit_button("Logg inn", use_container_width=True, type="primary")
+
+    if logg_inn:
+        brukere = st.secrets.get("auth", {})
+        if brukernavn in brukere and brukere[brukernavn]["passord"] == passord:
+            st.session_state.autentisert = True
+            st.session_state.bruker = brukernavn
+            st.rerun()
+        else:
+            st.error("Feil brukernavn eller passord.")
+    st.stop()
+
+
+# ---------------------------------------------------------------------------
+# Sidebar – bruker, prosjekter, logg ut
+# ---------------------------------------------------------------------------
+with st.sidebar:
+    st.markdown(f"Innlogget som **{st.session_state.bruker}**")
+    if st.button("Logg ut", use_container_width=True):
+        for key in list(st.session_state.keys()):
+            del st.session_state[key]
+        st.rerun()
+
+    st.divider()
+
+    # Lagre prosjekt (kun synlig på steg 5)
+    if st.session_state.get("steg") == 5 and sheets_er_konfigurert():
+        if st.button("Lagre prosjekt", use_container_width=True, type="primary"):
+            try:
+                pid = lagre_prosjekt(st.session_state.bruker)
+                st.success(f"Prosjekt lagret! (ID: {pid})")
+            except Exception as e:
+                st.error(f"Kunne ikke lagre: {e}")
+
+    # Liste over lagrede prosjekter
+    if sheets_er_konfigurert():
+        st.markdown("#### Lagrede prosjekter")
+        try:
+            prosjekter = hent_alle_prosjekter()
+            if not prosjekter:
+                st.caption("Ingen lagrede prosjekter ennå.")
+            for idx, proj in enumerate(prosjekter):
+                adr = proj.get("adresse", "Ukjent")
+                dato = proj.get("dato", "")
+                bruker = proj.get("bruker", "")
+                st.markdown(f"**{adr}**  \n{dato} – {bruker}")
+                if st.button("Åpne", key=f"open_{idx}", use_container_width=True):
+                    last_prosjekt(proj)
+                    st.rerun()
+        except Exception as e:
+            st.caption(f"Kunne ikke hente prosjekter: {e}")
+    else:
+        st.caption("Google Sheets er ikke konfigurert. Prosjektlagring er deaktivert.")
 
 
 def fmt(tall):
@@ -417,6 +486,7 @@ elif st.session_state.steg == 4:
             st.rerun()
     with kol_h:
         if st.button("Se kalkyle →", use_container_width=True, type="primary"):
+            st.session_state["_tjeneste"] = st.session_state.get("tjeneste", "Flisarbeider + tømrerarbeider")
             st.session_state.steg = 5
             st.rerun()
 
@@ -610,6 +680,10 @@ elif st.session_state.steg == 5:
             st.rerun()
     with kol_h:
         if st.button("Ny kalkyle", use_container_width=True, type="primary"):
+            autentisert = st.session_state.get("autentisert")
+            bruker = st.session_state.get("bruker")
             for nk in list(st.session_state.keys()):
                 del st.session_state[nk]
+            st.session_state.autentisert = autentisert
+            st.session_state.bruker = bruker
             st.rerun()
