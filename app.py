@@ -68,7 +68,10 @@ def beregn_flisarbeider(d):
 
     nisjer = d.get("antall_nisjer", 0)
     if nisjer > 0:
-        poster.append(p("Nisje flisarbeid", nisjer, "stk", FLIS["nisje_flis"]))
+        if "Gjæring" in d.get("nisje_beh", "List"):
+            poster.append(p("Nisje m/gjæring", nisjer, "stk", FLIS["nisje_flis_gjaring"]))
+        else:
+            poster.append(p("Nisje m/list", nisjer, "stk", FLIS["nisje_flis_list"]))
 
     cist = d.get("antall_cisternekasser", 0)
     if cist > 0:
@@ -346,6 +349,13 @@ elif st.session_state.steg == 3:
     with k2:
         st.number_input("Antall cisternekasser", 0, 10, 0, 1, key="antall_cisternekasser")
 
+    if st.session_state.get("antall_nisjer", 0) > 0:
+        st.radio(
+            "Nisje behandling",
+            ["List (3 500 kr/stk)", "Gjæring (4 500 kr/stk)"],
+            horizontal=True, key="nisje_beh",
+        )
+
     if st.session_state.get("antall_cisternekasser", 0) > 0:
         st.radio(
             "Cisternekasse behandling",
@@ -376,7 +386,8 @@ elif st.session_state.steg == 3:
                 "innvendige_hjorner", "utvendige_hjorner", "hjorne_behandling",
                 "isolering_vegg", "isolering_tak", "paforing_vegg",
                 "antall_innerdorer", "antall_skyvedorer",
-                "antall_nisjer", "antall_cisternekasser", "cisternekasse_beh",
+                "antall_nisjer", "nisje_beh",
+                "antall_cisternekasser", "cisternekasse_beh",
                 "epoxy_valg",
             ]:
                 if nk in st.session_state:
