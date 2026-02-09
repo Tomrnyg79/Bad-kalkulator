@@ -58,8 +58,15 @@ with st.sidebar:
         if har_prosjekt:
             if st.button("Lagre kalkyle", use_container_width=True, type="primary"):
                 try:
-                    oppdater_prosjekt(st.session_state["prosjekt_id"], st.session_state.bruker)
+                    pid = st.session_state["prosjekt_id"]
+                    oppdater_prosjekt(pid, st.session_state.bruker)
+                    # Lagre kalkyle-PDF som dokument
+                    edata = st.session_state.get("_eksport_data")
+                    if edata:
+                        pdf_bytes = generer_pdf(edata)
+                        lagre_dokument(pid, "Kalkyle", pdf_bytes)
                     st.success("Kalkyle lagret!")
+                    st.rerun()
                 except Exception as e:
                     st.error(f"Kunne ikke lagre: {e}")
         if st.button("Lagre som nytt prosjekt", use_container_width=True,
@@ -67,7 +74,13 @@ with st.sidebar:
             try:
                 pid = lagre_prosjekt(st.session_state.bruker)
                 st.session_state["prosjekt_id"] = pid
+                # Lagre kalkyle-PDF som dokument
+                edata = st.session_state.get("_eksport_data")
+                if edata:
+                    pdf_bytes = generer_pdf(edata)
+                    lagre_dokument(pid, "Kalkyle", pdf_bytes)
                 st.success(f"Nytt prosjekt lagret! (ID: {pid})")
+                st.rerun()
             except Exception as e:
                 st.error(f"Kunne ikke lagre: {e}")
 
@@ -969,6 +982,9 @@ elif st.session_state.steg == 5:
         "mva": mva,
         "total_inkl": total_inkl,
     }
+
+    # Lagre eksportdata i session state for bruk av "Lagre kalkyle"-knappen
+    st.session_state["_eksport_data"] = eksport_data
 
     st.divider()
     st.subheader("Eksporter kalkyle")
