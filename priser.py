@@ -60,6 +60,7 @@ TOMRER = {
     "kun_nye_lister": 850,
     "nisje": 1900,
     "utvendig_hjorne": 750,
+    "cisternekasse": 1950,
     "ekstra_innvendig_hjorne": 250,
     "timepris": 825,
     "rigg_oppstart": 3500,

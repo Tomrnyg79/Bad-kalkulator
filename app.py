@@ -310,6 +310,7 @@ def beregn_tomrerarbeid(d):
 
     cist = d.get("antall_cisternekasser", 0)
     if cist > 0:
+        poster.append(p("Cisternekasse tømrer", cist, "stk", TOMRER["cisternekasse"]))
         cist_beh = d.get("cisternekasse_beh", "List")
         if "Gips" in cist_beh:
             poster.append(p("Cisternekasse gips/trevirke", cist, "stk", FLIS["cisternekasse_gips_trevirke"]))
