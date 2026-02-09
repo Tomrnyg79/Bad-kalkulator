@@ -365,7 +365,7 @@ if st.session_state.get("vis_dokumenter"):
         for doc in dok_liste:
             doc_id = doc["id"]
             doc_name = doc["name"]
-            created = doc.get("createdTime", "")[:10]  # YYYY-MM-DD
+            created = doc.get("created", "")
 
             st.markdown(f"**{doc_name}**  \n*{created}*")
             dk1, dk2, dk3 = st.columns(3)

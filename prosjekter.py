@@ -4,15 +4,13 @@ Google Sheets CRUD for lagring og henting av prosjekter.
 Sheet-kolonner: id | adresse | dato | bruker | json_data
 """
 
-import io
+import base64
 import json
 import uuid
 import datetime
 import streamlit as st
 import gspread
 from google.oauth2.service_account import Credentials
-from googleapiclient.discovery import build
-from googleapiclient.http import MediaIoBaseUpload, MediaIoBaseDownload
 
 
 SCOPES = [
@@ -120,89 +118,96 @@ def sheets_er_konfigurert():
 
 
 # ---------------------------------------------------------------------------
-# Google Drive – dokumenthåndtering
+# Google Sheets – dokumenthåndtering (base64 i celler)
 # ---------------------------------------------------------------------------
 
-_ROOT_FOLDER_NAME = "Bad-kalkulator dokumenter"
+_CHUNK_SIZE = 45000  # maks tegn per celle (trygg margin under 50k-grensen)
 
 
-@st.cache_resource
-def _get_drive_service():
-    """Bygg Google Drive API-klient fra eksisterende credentials."""
-    creds_dict = dict(st.secrets["gcp_service_account"])
-    creds = Credentials.from_service_account_info(creds_dict, scopes=SCOPES)
-    return build("drive", "v3", credentials=creds, cache_discovery=False)
-
-
-def _get_or_create_folder(name, parent_id=None):
-    """Finn eksisterende mappe eller opprett ny. Returnerer mappe-ID."""
-    service = _get_drive_service()
-    query = f"name='{name}' and mimeType='application/vnd.google-apps.folder' and trashed=false"
-    if parent_id:
-        query += f" and '{parent_id}' in parents"
-    results = service.files().list(q=query, fields="files(id)").execute()
-    files = results.get("files", [])
-    if files:
-        return files[0]["id"]
-    metadata = {"name": name, "mimeType": "application/vnd.google-apps.folder"}
-    if parent_id:
-        metadata["parents"] = [parent_id]
-    folder = service.files().create(body=metadata, fields="id").execute()
-    return folder["id"]
-
-
-def _get_project_folder(prosjekt_id):
-    """Hent eller opprett prosjektmappe under rotmappen."""
-    root_id = _get_or_create_folder(_ROOT_FOLDER_NAME)
-    return _get_or_create_folder(f"proj_{prosjekt_id}", parent_id=root_id)
+def _get_doc_worksheet():
+    """Hent eller opprett 'dokumenter'-arket."""
+    client = _get_client()
+    url = st.secrets["google_sheets"]["url"]
+    sheet = client.open_by_url(url)
+    try:
+        ws = sheet.worksheet("dokumenter")
+    except gspread.exceptions.WorksheetNotFound:
+        ws = sheet.add_worksheet(title="dokumenter", rows=1, cols=7)
+        ws.append_row(["doc_id", "project_id", "doc_name", "created", "chunk", "chunks_total", "data"])
+    return ws
 
 
 def lagre_dokument(prosjekt_id, filnavn, pdf_bytes):
-    """Last opp en PDF til prosjektets Drive-mappe."""
-    service = _get_drive_service()
-    folder_id = _get_project_folder(prosjekt_id)
+    """Lagre PDF som base64-chunks i 'dokumenter'-arket."""
+    ws = _get_doc_worksheet()
+    doc_id = str(uuid.uuid4())[:8]
     if not filnavn.lower().endswith(".pdf"):
         filnavn += ".pdf"
-    metadata = {"name": filnavn, "parents": [folder_id]}
-    media = MediaIoBaseUpload(io.BytesIO(pdf_bytes), mimetype="application/pdf")
-    uploaded = service.files().create(body=metadata, media_body=media, fields="id").execute()
-    return uploaded["id"]
+    dato = datetime.datetime.now().strftime("%d.%m.%Y %H:%M")
+    encoded = base64.b64encode(pdf_bytes).decode("ascii")
+    chunks = [encoded[i:i + _CHUNK_SIZE] for i in range(0, len(encoded), _CHUNK_SIZE)] or [""]
+    total = len(chunks)
+    rows = []
+    for idx, chunk in enumerate(chunks):
+        rows.append([doc_id, str(prosjekt_id), filnavn, dato, idx, total, chunk])
+    ws.append_rows(rows, value_input_option="RAW")
+    return doc_id
 
 
 def hent_dokumenter(prosjekt_id):
-    """List alle dokumenter i prosjektmappen. Returnerer liste med dicts."""
-    service = _get_drive_service()
-    folder_id = _get_project_folder(prosjekt_id)
-    query = f"'{folder_id}' in parents and trashed=false"
-    results = service.files().list(
-        q=query,
-        fields="files(id, name, createdTime)",
-        orderBy="createdTime desc",
-    ).execute()
-    return results.get("files", [])
+    """List unike dokumenter for et prosjekt. Returnerer liste med dicts."""
+    ws = _get_doc_worksheet()
+    rader = ws.get_all_records()
+    sett = {}
+    pid = str(prosjekt_id)
+    for rad in rader:
+        if str(rad.get("project_id", "")) == pid and rad.get("chunk", 0) == 0:
+            sett[rad["doc_id"]] = {
+                "id": rad["doc_id"],
+                "name": rad.get("doc_name", ""),
+                "created": rad.get("created", ""),
+            }
+    # Nyeste først (basert på rekkefølge i arket, reversert)
+    return list(reversed(sett.values()))
 
 
-def last_ned_dokument(file_id):
-    """Last ned filinnhold fra Drive. Returnerer bytes."""
-    service = _get_drive_service()
-    request = service.files().get_media(fileId=file_id)
-    buf = io.BytesIO()
-    downloader = MediaIoBaseDownload(buf, request)
-    done = False
-    while not done:
-        _, done = downloader.next_chunk()
-    return buf.getvalue()
+def last_ned_dokument(doc_id):
+    """Hent PDF-bytes for et dokument (sett sammen chunks)."""
+    ws = _get_doc_worksheet()
+    rader = ws.get_all_records()
+    chunks = {}
+    for rad in rader:
+        if str(rad.get("doc_id", "")) == str(doc_id):
+            chunks[int(rad.get("chunk", 0))] = rad.get("data", "")
+    if not chunks:
+        raise ValueError(f"Dokument {doc_id} ikke funnet")
+    encoded = "".join(chunks[i] for i in range(len(chunks)))
+    return base64.b64decode(encoded)
 
 
-def slett_dokument(file_id):
-    """Slett en fil fra Drive."""
-    service = _get_drive_service()
-    service.files().delete(fileId=file_id).execute()
+def slett_dokument(doc_id):
+    """Slett alle rader for et dokument."""
+    ws = _get_doc_worksheet()
+    alle = ws.get_all_values()
+    # Finn rader å slette (bakfra for å unngå indeksforskyvning)
+    rader_å_slette = []
+    for idx, rad in enumerate(alle):
+        if idx == 0:
+            continue  # hopp over header
+        if rad[0] == str(doc_id):
+            rader_å_slette.append(idx + 1)  # gspread bruker 1-indeksering
+    for rad_nr in reversed(rader_å_slette):
+        ws.delete_rows(rad_nr)
 
 
-def endre_dokumentnavn(file_id, nytt_navn):
-    """Endre filnavn i Drive."""
-    service = _get_drive_service()
+def endre_dokumentnavn(doc_id, nytt_navn):
+    """Endre dokumentnavn for alle chunks."""
+    ws = _get_doc_worksheet()
     if not nytt_navn.lower().endswith(".pdf"):
         nytt_navn += ".pdf"
-    service.files().update(fileId=file_id, body={"name": nytt_navn}).execute()
+    alle = ws.get_all_values()
+    for idx, rad in enumerate(alle):
+        if idx == 0:
+            continue
+        if rad[0] == str(doc_id):
+            ws.update_cell(idx + 1, 3, nytt_navn)  # kolonne 3 = doc_name
