@@ -210,9 +210,7 @@ def beregn_flisarbeider(d):
         cist_beh = d.get("cisternekasse_beh", "List")
         if "Gjæring" in cist_beh:
             poster.append(p("Cisternekasse m/gjæring", cist, "stk", FLIS["cisternekasse_gjaring"]))
-        elif "Gips" in cist_beh:
-            poster.append(p("Cisternekasse gips/trevirke", cist, "stk", FLIS["cisternekasse_gips_trevirke"]))
-        else:
+        elif "Gips" not in cist_beh:
             poster.append(p("Cisternekasse m/list", cist, "stk", FLIS["cisternekasse_list"]))
 
     # Silikonering: innvendige hjørner (høyde per stk) + overgang gulv/vegg (løpemeter)
@@ -280,6 +278,12 @@ def beregn_tomrerarbeid(d):
     utv = d.get("utvendige_hjorner", 0)
     if utv > 0:
         poster.append(p("Utvendige hjørner", utv, "stk", TOMRER["utvendig_hjorne"]))
+
+    cist = d.get("antall_cisternekasser", 0)
+    if cist > 0:
+        cist_beh = d.get("cisternekasse_beh", "List")
+        if "Gips" in cist_beh:
+            poster.append(p("Cisternekasse gips/trevirke", cist, "stk", FLIS["cisternekasse_gips_trevirke"]))
 
     innv = d.get("innvendige_hjorner", 4)
     if innv > 4:
