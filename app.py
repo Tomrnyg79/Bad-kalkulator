@@ -4,9 +4,10 @@ import re
 
 from priser import FIRMA, MVA_SATS, FLIS, TOMRER, EPOXY_VALG
 from eksport import generer_pdf, generer_excel, send_epost, generer_tekst_dokument_pdf, generer_bilde_dokument_pdf
-from prosjekter import (lagre_prosjekt, hent_alle_prosjekter, last_prosjekt, sheets_er_konfigurert,
-                         slett_prosjekt, lagre_dokument, hent_dokumenter, last_ned_dokument,
-                         slett_dokument, endre_dokumentnavn, imap_er_konfigurert, sjekk_epost)
+from prosjekter import (lagre_prosjekt, oppdater_prosjekt, hent_alle_prosjekter, last_prosjekt,
+                         sheets_er_konfigurert, slett_prosjekt, lagre_dokument, hent_dokumenter,
+                         last_ned_dokument, slett_dokument, endre_dokumentnavn,
+                         imap_er_konfigurert, sjekk_epost)
 
 st.set_page_config(page_title="Baderoms kalkyle | Nygård Bad", page_icon="🛁", layout="centered")
 
@@ -51,13 +52,22 @@ with st.sidebar:
 
     st.divider()
 
-    # Lagre prosjekt (kun synlig på steg 5)
+    # Lagre/oppdater prosjekt (kun synlig på steg 5)
     if st.session_state.get("steg") == 5 and sheets_er_konfigurert():
-        if st.button("Lagre prosjekt", use_container_width=True, type="primary"):
+        har_prosjekt = bool(st.session_state.get("prosjekt_id"))
+        if har_prosjekt:
+            if st.button("Lagre kalkyle", use_container_width=True, type="primary"):
+                try:
+                    oppdater_prosjekt(st.session_state["prosjekt_id"], st.session_state.bruker)
+                    st.success("Kalkyle lagret!")
+                except Exception as e:
+                    st.error(f"Kunne ikke lagre: {e}")
+        if st.button("Lagre som nytt prosjekt", use_container_width=True,
+                      type="secondary" if har_prosjekt else "primary"):
             try:
                 pid = lagre_prosjekt(st.session_state.bruker)
                 st.session_state["prosjekt_id"] = pid
-                st.success(f"Prosjekt lagret! (ID: {pid})")
+                st.success(f"Nytt prosjekt lagret! (ID: {pid})")
             except Exception as e:
                 st.error(f"Kunne ikke lagre: {e}")
 

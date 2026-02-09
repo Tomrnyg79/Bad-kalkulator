@@ -63,6 +63,23 @@ def lagre_prosjekt(bruker):
     return prosjekt_id
 
 
+def oppdater_prosjekt(prosjekt_id, bruker):
+    """Oppdater et eksisterende prosjekt med gjeldende session state."""
+    ws = _get_worksheet()
+    alle = ws.get_all_values()
+    for idx, rad in enumerate(alle):
+        if idx == 0:
+            continue
+        if rad[0] == str(prosjekt_id):
+            adresse = st.session_state.get("_adresse", st.session_state.get("adresse", "Ukjent"))
+            dato = datetime.datetime.now().strftime("%d.%m.%Y %H:%M")
+            json_data = _session_state_til_json()
+            ws.update(f"A{idx+1}:E{idx+1}", [[str(prosjekt_id), adresse, dato, bruker, json_data]])
+            return prosjekt_id
+    # Hvis prosjektet ikke finnes, opprett nytt
+    return lagre_prosjekt(bruker)
+
+
 def slett_prosjekt(prosjekt_id):
     """Slett et prosjekt og tilhørende dokumenter fra Google Sheets."""
     # Slett prosjektraden
