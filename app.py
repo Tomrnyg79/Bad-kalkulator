@@ -338,19 +338,13 @@ def etasjetillegg_prosent(d):
 if "steg" not in st.session_state:
     st.session_state.steg = 1
 
-# Gjenopprett lagrede verdier for widgetfrie nøkler (navigering tilbake)
-# Widgets med key= håndterer sine egne verdier, så vi gjenoppretter kun
-# nøkler som ikke har en tilhørende widget på gjeldende steg.
-_WIDGET_FRIE = {
-    "antall_vegger", "lopemeter", "veggareal",
-    "rigg_flis", "rigg_tomrer",
-    "flisomfang", "flisomfang_valg", "hjorne_behandling", "hjorne_beh_valg",
-    "heis_valg",
-}
+# Gjenopprett lagrede verdier ved navigering tilbake.
+# Streamlit fjerner widget-nøkler når widgeten ikke rendres, men
+# _-prefiks-verdiene overlever. Kopier tilbake alle som mangler.
 for _k in list(st.session_state.keys()):
     if _k.startswith("_") and not _k.startswith("__"):
         _navn = _k[1:]
-        if _navn in _WIDGET_FRIE and _navn not in st.session_state:
+        if _navn not in st.session_state:
             st.session_state[_navn] = st.session_state[_k]
 
 STEG = ["Prosjekt", "Rommål", "Romdetaljer", "Tjeneste", "Oppsummering"]
