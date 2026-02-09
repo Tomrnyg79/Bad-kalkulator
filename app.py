@@ -387,7 +387,17 @@ if st.session_state.get("vis_dokumenter"):
         st.stop()
 
     # --- Kontakter ---
-    _ROLLER = ["Kunde", "Rørlegger", "Elektriker", "Membranlegger", "Nabo", "Annet"]
+    _ROLLER = ["Kunde", "Rørlegger", "Elektriker", "Membranlegger", "Uavhengig kontroll", "Nabo", "Annet"]
+
+    _HURTIGVALG = {
+        "Rørlegger": [
+            {"navn": "Jonathan", "tlf": "41200610", "epost": ""},
+            {"navn": "Lisa", "tlf": "48088428", "epost": ""},
+        ],
+        "Elektriker": [
+            {"navn": "Johan", "tlf": "92446216", "epost": ""},
+        ],
+    }
 
     try:
         kontakter = hent_kontakter(prosjekt_id)
@@ -407,7 +417,7 @@ if st.session_state.get("vis_dokumenter"):
                 # Redigeringsmodus
                 rk1, rk2 = st.columns(2)
                 with rk1:
-                    ny_rolle = st.selectbox("Rolle", _ROLLER, index=_ROLLER.index(rolle) if rolle in _ROLLER else 5, key=f"kr_rolle_{ki}")
+                    ny_rolle = st.selectbox("Rolle", _ROLLER, index=_ROLLER.index(rolle) if rolle in _ROLLER else len(_ROLLER) - 1, key=f"kr_rolle_{ki}")
                     ny_navn = st.text_input("Navn", value=navn, key=f"kr_navn_{ki}")
                 with rk2:
                     ny_tlf = st.text_input("Tlf", value=tlf, key=f"kr_tlf_{ki}")
@@ -438,13 +448,26 @@ if st.session_state.get("vis_dokumenter"):
         st.divider()
 
     with st.expander("+ Legg til kontakt"):
+        ny_rolle = st.selectbox("Rolle", _ROLLER, key="ny_kontakt_rolle")
+
+        # Hurtigvalg for roller med forhåndsdefinerte kontakter
+        valgt_person = None
+        if ny_rolle in _HURTIGVALG:
+            personer = _HURTIGVALG[ny_rolle]
+            valg_liste = ["Velg..."] + [p["navn"] for p in personer] + ["Annen"]
+            valgt = st.selectbox("Hurtigvalg", valg_liste, key="ny_kontakt_hurtigvalg")
+            if valgt != "Velg..." and valgt != "Annen":
+                valgt_person = next(p for p in personer if p["navn"] == valgt)
+
         nk1, nk2 = st.columns(2)
         with nk1:
-            ny_rolle = st.selectbox("Rolle", _ROLLER, key="ny_kontakt_rolle")
-            ny_navn = st.text_input("Navn", key="ny_kontakt_navn")
+            default_navn = valgt_person["navn"] if valgt_person else ""
+            ny_navn = st.text_input("Navn", value=default_navn, key="ny_kontakt_navn")
         with nk2:
-            ny_tlf = st.text_input("Telefon", key="ny_kontakt_tlf")
-            ny_epost = st.text_input("E-post", key="ny_kontakt_epost")
+            default_tlf = valgt_person["tlf"] if valgt_person else ""
+            ny_tlf = st.text_input("Telefon", value=default_tlf, key="ny_kontakt_tlf")
+        ny_epost = st.text_input("E-post", key="ny_kontakt_epost")
+
         if st.button("Legg til kontakt", type="primary", key="btn_ny_kontakt"):
             if not ny_navn.strip():
                 st.error("Fyll inn navn.")
