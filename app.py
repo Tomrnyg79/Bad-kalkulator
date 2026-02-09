@@ -182,7 +182,8 @@ def p(navn, mengde, enhet, enhetspris):
 
 def beregn_flisarbeider(d):
     poster = []
-    poster.append(p("Rigg/oppstart", 1, "stk", FLIS["rigg_oppstart"]))
+    if d.get("rigg_flis", True):
+        poster.append(p("Rigg/oppstart", 1, "stk", FLIS["rigg_oppstart"]))
     gulv = d.get("gulvareal", 0)
     vegg = d.get("veggareal", 0)
     lm = d.get("lopemeter", 0)
@@ -256,7 +257,8 @@ def beregn_flisarbeider(d):
 
 def beregn_tomrerarbeid(d):
     poster = []
-    poster.append(p("Rigg/oppstart", 1, "stk", TOMRER["rigg_oppstart"]))
+    if d.get("rigg_tomrer", True):
+        poster.append(p("Rigg/oppstart", 1, "stk", TOMRER["rigg_oppstart"]))
     gulv = d.get("gulvareal", 0)
     vegg = d.get("veggareal", 0)
 
@@ -337,6 +339,7 @@ if "steg" not in st.session_state:
 # nøkler som ikke har en tilhørende widget på gjeldende steg.
 _WIDGET_FRIE = {
     "antall_vegger", "lopemeter", "veggareal",
+    "rigg_flis", "rigg_tomrer",
     "flisomfang", "flisomfang_valg", "hjorne_behandling", "hjorne_beh_valg",
     "heis_valg",
 }
@@ -629,6 +632,20 @@ elif st.session_state.steg == 2:
 elif st.session_state.steg == 3:
     st.subheader("Romdetaljer")
 
+    # --- Rigg/oppstart ---
+    st.markdown("#### Rigg og oppstart")
+    k1, k2 = st.columns(2)
+    with k1:
+        if "rigg_flis" not in st.session_state:
+            st.session_state.rigg_flis = True
+        st.checkbox("Rigg/oppstart flisarbeider", key="rigg_flis")
+    with k2:
+        if "rigg_tomrer" not in st.session_state:
+            st.session_state.rigg_tomrer = True
+        st.checkbox("Rigg/oppstart tømrerarbeider", key="rigg_tomrer")
+
+    st.divider()
+
     # --- Flisvalg ---
     st.markdown("#### Flisvalg")
     st.radio("Flislegging", ["Vegg og gulv", "Kun gulv (gips på vegger)"], horizontal=True, key="flisomfang_valg")
@@ -810,6 +827,7 @@ elif st.session_state.steg == 3:
         if st.button("Neste →", use_container_width=True, type="primary"):
             # Lagre alle steg 3-verdier eksplisitt så de overlever til steg 5
             for nk in [
+                "rigg_flis", "rigg_tomrer",
                 "flisomfang", "flisomfang_valg",
                 "flis_str_gulv", "flis_str_vegg", "finer_bak_gips",
                 "membran_gulv_type",
