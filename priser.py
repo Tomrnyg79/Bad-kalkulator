@@ -34,7 +34,7 @@ FLIS = {
     "gjaring_hjorne": 2500,
     "stor_flis_faktor": 1.30,
     "rigg_oppstart": 3500,
-    "silikonering": 75,
+    "silikonering": 175,
 }
 
 EPOXY_VALG = {
