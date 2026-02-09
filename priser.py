@@ -24,6 +24,7 @@ FLIS = {
     "sokkelflis": 250,
     "cisternekasse_list": 3500,
     "cisternekasse_gjaring": 4500,
+    "cisternekasse_gips_trevirke": 1950,
     "dokumentasjon": 3500,
     "nisje_flis_list": 3500,
     "nisje_flis_gjaring": 4500,

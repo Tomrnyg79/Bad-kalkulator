@@ -146,8 +146,11 @@ def beregn_flisarbeider(d):
 
     cist = d.get("antall_cisternekasser", 0)
     if cist > 0:
-        if "Gjæring" in d.get("cisternekasse_beh", "List"):
+        cist_beh = d.get("cisternekasse_beh", "List")
+        if "Gjæring" in cist_beh:
             poster.append(p("Cisternekasse m/gjæring", cist, "stk", FLIS["cisternekasse_gjaring"]))
+        elif "Gips" in cist_beh:
+            poster.append(p("Cisternekasse gips/trevirke", cist, "stk", FLIS["cisternekasse_gips_trevirke"]))
         else:
             poster.append(p("Cisternekasse m/list", cist, "stk", FLIS["cisternekasse_list"]))
 
@@ -507,7 +510,7 @@ elif st.session_state.steg == 3:
     if st.session_state.get("antall_cisternekasser", 0) > 0:
         st.radio(
             "Cisternekasse behandling",
-            ["List (3 500 kr/stk)", "Gjæring (4 500 kr/stk)"],
+            ["List (3 500 kr/stk)", "Gjæring (4 500 kr/stk)", "Gips/trevirke (1 950 kr/stk)"],
             horizontal=True, key="cisternekasse_beh",
         )
 
