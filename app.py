@@ -312,7 +312,11 @@ if "steg" not in st.session_state:
 # Gjenopprett lagrede verdier for widgetfrie nøkler (navigering tilbake)
 # Widgets med key= håndterer sine egne verdier, så vi gjenoppretter kun
 # nøkler som ikke har en tilhørende widget på gjeldende steg.
-_WIDGET_FRIE = {"antall_vegger", "lopemeter", "veggareal", "flisomfang", "hjorne_behandling"}
+_WIDGET_FRIE = {
+    "antall_vegger", "lopemeter", "veggareal",
+    "flisomfang", "flisomfang_valg", "hjorne_behandling", "hjorne_beh_valg",
+    "heis_valg",
+}
 for _k in list(st.session_state.keys()):
     if _k.startswith("_") and not _k.startswith("__"):
         _navn = _k[1:]
@@ -516,9 +520,11 @@ if st.session_state.steg == 1:
                 if st.session_state.get("bygningstype") == "Blokk / Leilighet":
                     st.session_state["_etasje"] = st.session_state.get("etasje", 1)
                     st.session_state["_heis"] = st.session_state.get("heis_valg", "Ja")
+                    st.session_state["_heis_valg"] = st.session_state.get("heis_valg", "Ja")
                 else:
                     st.session_state["_etasje"] = 1
                     st.session_state["_heis"] = "Ja"
+                    st.session_state["_heis_valg"] = "Ja"
                 st.session_state.steg = 2
                 st.rerun()
 
@@ -781,10 +787,12 @@ elif st.session_state.steg == 3:
         if st.button("Neste →", use_container_width=True, type="primary"):
             # Lagre alle steg 3-verdier eksplisitt så de overlever til steg 5
             for nk in [
-                "flisomfang", "flis_str_gulv", "flis_str_vegg", "finer_bak_gips",
+                "flisomfang", "flisomfang_valg",
+                "flis_str_gulv", "flis_str_vegg", "finer_bak_gips",
                 "membran_gulv_type",
                 "areal_dusjgulv", "antall_sluk",
-                "innvendige_hjorner", "utvendige_hjorner", "hjorne_behandling",
+                "innvendige_hjorner", "utvendige_hjorner",
+                "hjorne_behandling", "hjorne_beh_valg",
                 "isolering_vegg", "isolering_tak", "paforing_vegg",
                 "antall_innerdorer", "antall_skyvedorer", "antall_kun_nye_lister",
                 "antall_nisjer", "nisje_beh",
