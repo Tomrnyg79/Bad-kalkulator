@@ -160,12 +160,14 @@ def last_prosjekt(prosjekt):
     # Sett prosjekt-ID for dokumenthåndtering
     st.session_state["prosjekt_id"] = prosjekt.get("id", "")
 
-    # E-post-prosjekter har kun adresse – start på steg 1
-    if prosjekt.get("bruker", "") == "e-post":
+    # Sjekk om prosjektet har kalkydata (mer enn bare adresse)
+    har_kalkyle = any(k in data for k in ("_gulvareal", "_veggareal", "_flisomfang"))
+    if har_kalkyle:
+        st.session_state["steg"] = 5
+    else:
+        # Kun adresse (f.eks. fra e-post) – start på steg 1
         st.session_state["steg"] = 1
         st.session_state["adresse"] = data.get("_adresse", prosjekt.get("adresse", ""))
-    else:
-        st.session_state["steg"] = 5
 
 
 def sheets_er_konfigurert():

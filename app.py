@@ -1090,10 +1090,14 @@ elif st.session_state.steg == 5:
                     st.error(f"Kunne ikke sende e-post: {e}")
 
     st.divider()
-    kol_v, kol_h = st.columns(2)
+    kol_v, kol_m, kol_h = st.columns(3)
     with kol_v:
         if st.button("← Tilbake", use_container_width=True):
             st.session_state.steg = 4
+            st.rerun()
+    with kol_m:
+        if st.button("Rediger kalkyle", use_container_width=True):
+            st.session_state.steg = 1
             st.rerun()
     with kol_h:
         if st.button("Ny kalkyle", use_container_width=True, type="primary"):
