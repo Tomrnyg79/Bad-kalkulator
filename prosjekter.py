@@ -160,8 +160,12 @@ def last_prosjekt(prosjekt):
     # Sett prosjekt-ID for dokumenthåndtering
     st.session_state["prosjekt_id"] = prosjekt.get("id", "")
 
-    # Gå til oppsummering
-    st.session_state["steg"] = 5
+    # E-post-prosjekter har kun adresse – start på steg 1
+    if prosjekt.get("bruker", "") == "e-post":
+        st.session_state["steg"] = 1
+        st.session_state["adresse"] = data.get("_adresse", prosjekt.get("adresse", ""))
+    else:
+        st.session_state["steg"] = 5
 
 
 def sheets_er_konfigurert():
