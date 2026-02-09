@@ -27,11 +27,17 @@ def _get_client():
     return gspread.authorize(creds)
 
 
-def _get_worksheet():
-    """Hent worksheet fra konfigurert Google Sheet."""
+@st.cache_resource
+def _get_sheet():
+    """Hent spreadsheet-objekt (cachet)."""
     client = _get_client()
     url = st.secrets["google_sheets"]["url"]
-    sheet = client.open_by_url(url)
+    return client.open_by_url(url)
+
+
+def _get_worksheet():
+    """Hent worksheet fra konfigurert Google Sheet."""
+    sheet = _get_sheet()
     ws = sheet.sheet1
     # Opprett header-rad om arket er tomt
     if ws.row_count == 0 or not ws.row_values(1):
@@ -60,6 +66,7 @@ def lagre_prosjekt(bruker):
     dato = datetime.datetime.now().strftime("%d.%m.%Y %H:%M")
     json_data = _session_state_til_json()
     ws.append_row([prosjekt_id, adresse, dato, bruker, json_data])
+    _tøm_prosjekt_cache()
     return prosjekt_id
 
 
@@ -75,6 +82,7 @@ def oppdater_prosjekt(prosjekt_id, bruker):
             dato = datetime.datetime.now().strftime("%d.%m.%Y %H:%M")
             json_data = _session_state_til_json()
             ws.update(f"A{idx+1}:E{idx+1}", [[str(prosjekt_id), adresse, dato, bruker, json_data]])
+            _tøm_prosjekt_cache()
             return prosjekt_id
     # Hvis prosjektet ikke finnes, opprett nytt
     return lagre_prosjekt(bruker)
@@ -105,14 +113,21 @@ def slett_prosjekt(prosjekt_id):
             dws.delete_rows(rad_nr)
     except Exception:
         pass  # OK om dokumenter-arket ikke finnes ennå
+    _tøm_prosjekt_cache()
 
 
+@st.cache_data(ttl=120)
 def hent_alle_prosjekter():
-    """Hent alle lagrede prosjekter. Returnerer liste med dicts, nyeste først."""
+    """Hent alle lagrede prosjekter (cachet 2 min). Returnerer liste med dicts, nyeste først."""
     ws = _get_worksheet()
     rader = ws.get_all_records()
     rader.reverse()
     return rader
+
+
+def _tøm_prosjekt_cache():
+    """Tøm prosjekt-cachen etter endringer."""
+    hent_alle_prosjekter.clear()
 
 
 def last_prosjekt(prosjekt):
@@ -170,9 +185,7 @@ _CHUNK_SIZE = 45000  # maks tegn per celle (trygg margin under 50k-grensen)
 
 def _get_doc_worksheet():
     """Hent eller opprett 'dokumenter'-arket."""
-    client = _get_client()
-    url = st.secrets["google_sheets"]["url"]
-    sheet = client.open_by_url(url)
+    sheet = _get_sheet()
     try:
         ws = sheet.worksheet("dokumenter")
     except gspread.exceptions.WorksheetNotFound:
@@ -195,9 +208,11 @@ def lagre_dokument(prosjekt_id, filnavn, pdf_bytes):
     for idx, chunk in enumerate(chunks):
         rows.append([doc_id, str(prosjekt_id), filnavn, dato, idx, total, chunk])
     ws.append_rows(rows, value_input_option="RAW")
+    _tøm_dok_cache()
     return doc_id
 
 
+@st.cache_data(ttl=120)
 def hent_dokumenter(prosjekt_id):
     """List unike dokumenter for et prosjekt. Returnerer liste med dicts."""
     ws = _get_doc_worksheet()
@@ -213,6 +228,11 @@ def hent_dokumenter(prosjekt_id):
             }
     # Nyeste først (basert på rekkefølge i arket, reversert)
     return list(reversed(sett.values()))
+
+
+def _tøm_dok_cache():
+    """Tøm dokument-cachen etter endringer."""
+    hent_dokumenter.clear()
 
 
 def last_ned_dokument(doc_id):
@@ -242,6 +262,7 @@ def slett_dokument(doc_id):
             rader_å_slette.append(idx + 1)  # gspread bruker 1-indeksering
     for rad_nr in reversed(rader_å_slette):
         ws.delete_rows(rad_nr)
+    _tøm_dok_cache()
 
 
 def endre_dokumentnavn(doc_id, nytt_navn):
@@ -255,6 +276,7 @@ def endre_dokumentnavn(doc_id, nytt_navn):
             continue
         if rad[0] == str(doc_id):
             ws.update_cell(idx + 1, 3, nytt_navn)  # kolonne 3 = doc_name
+    _tøm_dok_cache()
 
 
 # ---------------------------------------------------------------------------
@@ -408,4 +430,6 @@ def sjekk_epost():
     finally:
         mail.logout()
 
+    if opprettede:
+        _tøm_prosjekt_cache()
     return opprettede
