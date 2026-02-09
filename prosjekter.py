@@ -35,8 +35,9 @@ def _get_sheet():
     return client.open_by_url(url)
 
 
+@st.cache_resource
 def _get_worksheet():
-    """Hent worksheet fra konfigurert Google Sheet."""
+    """Hent worksheet fra konfigurert Google Sheet (cachet)."""
     sheet = _get_sheet()
     ws = sheet.sheet1
     # Opprett header-rad om arket er tomt
@@ -187,8 +188,9 @@ def sheets_er_konfigurert():
 # ---------------------------------------------------------------------------
 
 
+@st.cache_data(ttl=120)
 def hent_kontakter(prosjekt_id):
-    """Hent kontaktliste fra prosjektets json_data. Returnerer liste med dicts."""
+    """Hent kontaktliste fra prosjektets json_data (cachet 2 min)."""
     ws = _get_worksheet()
     alle = ws.get_all_values()
     for idx, rad in enumerate(alle):
@@ -201,6 +203,11 @@ def hent_kontakter(prosjekt_id):
                 data = {}
             return data.get("_kontakter", [])
     return []
+
+
+def _tøm_kontakt_cache():
+    """Tøm kontakt-cachen etter endringer."""
+    hent_kontakter.clear()
 
 
 def lagre_kontakter(prosjekt_id, kontakter):
@@ -217,6 +224,7 @@ def lagre_kontakter(prosjekt_id, kontakter):
                 data = {}
             data["_kontakter"] = kontakter
             ws.update_cell(idx + 1, 5, json.dumps(data, ensure_ascii=False))
+            _tøm_kontakt_cache()
             return
     raise ValueError(f"Prosjekt {prosjekt_id} ikke funnet")
 
@@ -228,8 +236,9 @@ def lagre_kontakter(prosjekt_id, kontakter):
 _CHUNK_SIZE = 45000  # maks tegn per celle (trygg margin under 50k-grensen)
 
 
+@st.cache_resource
 def _get_doc_worksheet():
-    """Hent eller opprett 'dokumenter'-arket."""
+    """Hent eller opprett 'dokumenter'-arket (cachet)."""
     sheet = _get_sheet()
     try:
         ws = sheet.worksheet("dokumenter")
