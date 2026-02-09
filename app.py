@@ -5,7 +5,9 @@ import re
 from priser import FIRMA, MVA_SATS, FLIS, TOMRER, EPOXY_VALG
 from eksport import generer_pdf, generer_excel, send_epost, generer_tekst_dokument_pdf, generer_bilde_dokument_pdf
 from prosjekter import (lagre_prosjekt, oppdater_prosjekt, hent_alle_prosjekter, last_prosjekt,
-                         sheets_er_konfigurert, slett_prosjekt, lagre_dokument, hent_dokumenter,
+                         sheets_er_konfigurert, slett_prosjekt,
+                         hent_kontakter, lagre_kontakter,
+                         lagre_dokument, hent_dokumenter,
                          last_ned_dokument, slett_dokument, endre_dokumentnavn,
                          imap_er_konfigurert, sjekk_epost)
 
@@ -383,6 +385,81 @@ if st.session_state.get("vis_dokumenter"):
     if not prosjekt_id:
         st.warning("Ingen prosjekt-ID funnet.")
         st.stop()
+
+    # --- Kontakter ---
+    _ROLLER = ["Kunde", "Rørlegger", "Elektriker", "Membranlegger", "Nabo", "Annet"]
+
+    try:
+        kontakter = hent_kontakter(prosjekt_id)
+    except Exception:
+        kontakter = []
+
+    if kontakter:
+        st.markdown("#### Kontakter")
+        for ki, kont in enumerate(kontakter):
+            rolle = kont.get("rolle", "")
+            navn = kont.get("navn", "")
+            tlf = kont.get("tlf", "")
+            epost = kont.get("epost", "")
+            detaljer = " | ".join(d for d in [tlf, epost] if d)
+
+            if st.session_state.get(f"redigerer_kontakt_{ki}"):
+                # Redigeringsmodus
+                rk1, rk2 = st.columns(2)
+                with rk1:
+                    ny_rolle = st.selectbox("Rolle", _ROLLER, index=_ROLLER.index(rolle) if rolle in _ROLLER else 5, key=f"kr_rolle_{ki}")
+                    ny_navn = st.text_input("Navn", value=navn, key=f"kr_navn_{ki}")
+                with rk2:
+                    ny_tlf = st.text_input("Tlf", value=tlf, key=f"kr_tlf_{ki}")
+                    ny_epost = st.text_input("E-post", value=epost, key=f"kr_epost_{ki}")
+                bk1, bk2 = st.columns(2)
+                with bk1:
+                    if st.button("Lagre", key=f"ksave_{ki}", use_container_width=True, type="primary"):
+                        kontakter[ki] = {"rolle": ny_rolle, "navn": ny_navn, "tlf": ny_tlf, "epost": ny_epost}
+                        lagre_kontakter(prosjekt_id, kontakter)
+                        del st.session_state[f"redigerer_kontakt_{ki}"]
+                        st.rerun()
+                with bk2:
+                    if st.button("Avbryt", key=f"kcancel_{ki}", use_container_width=True):
+                        del st.session_state[f"redigerer_kontakt_{ki}"]
+                        st.rerun()
+            else:
+                st.markdown(f"**{rolle}:** {navn}" + (f"  \n{detaljer}" if detaljer else ""))
+                kb1, kb2 = st.columns([1, 1])
+                with kb1:
+                    if st.button("Rediger", key=f"kedit_{ki}", use_container_width=True):
+                        st.session_state[f"redigerer_kontakt_{ki}"] = True
+                        st.rerun()
+                with kb2:
+                    if st.button("Slett", key=f"kdel_{ki}", use_container_width=True):
+                        kontakter.pop(ki)
+                        lagre_kontakter(prosjekt_id, kontakter)
+                        st.rerun()
+        st.divider()
+
+    with st.expander("+ Legg til kontakt"):
+        nk1, nk2 = st.columns(2)
+        with nk1:
+            ny_rolle = st.selectbox("Rolle", _ROLLER, key="ny_kontakt_rolle")
+            ny_navn = st.text_input("Navn", key="ny_kontakt_navn")
+        with nk2:
+            ny_tlf = st.text_input("Telefon", key="ny_kontakt_tlf")
+            ny_epost = st.text_input("E-post", key="ny_kontakt_epost")
+        if st.button("Legg til kontakt", type="primary", key="btn_ny_kontakt"):
+            if not ny_navn.strip():
+                st.error("Fyll inn navn.")
+            else:
+                kontakter.append({
+                    "rolle": ny_rolle,
+                    "navn": ny_navn.strip(),
+                    "tlf": ny_tlf.strip(),
+                    "epost": ny_epost.strip(),
+                })
+                lagre_kontakter(prosjekt_id, kontakter)
+                st.success(f"{ny_rolle} «{ny_navn}» lagt til!")
+                st.rerun()
+
+    st.divider()
 
     # --- Dokumentliste (øverst) ---
     try:

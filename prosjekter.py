@@ -183,6 +183,45 @@ def sheets_er_konfigurert():
 
 
 # ---------------------------------------------------------------------------
+# Kontakter per prosjekt (lagret i json_data)
+# ---------------------------------------------------------------------------
+
+
+def hent_kontakter(prosjekt_id):
+    """Hent kontaktliste fra prosjektets json_data. Returnerer liste med dicts."""
+    ws = _get_worksheet()
+    alle = ws.get_all_values()
+    for idx, rad in enumerate(alle):
+        if idx == 0:
+            continue
+        if rad[0] == str(prosjekt_id):
+            try:
+                data = json.loads(rad[4]) if rad[4] else {}
+            except (json.JSONDecodeError, IndexError):
+                data = {}
+            return data.get("_kontakter", [])
+    return []
+
+
+def lagre_kontakter(prosjekt_id, kontakter):
+    """Oppdater kontaktlisten i prosjektets json_data."""
+    ws = _get_worksheet()
+    alle = ws.get_all_values()
+    for idx, rad in enumerate(alle):
+        if idx == 0:
+            continue
+        if rad[0] == str(prosjekt_id):
+            try:
+                data = json.loads(rad[4]) if rad[4] else {}
+            except (json.JSONDecodeError, IndexError):
+                data = {}
+            data["_kontakter"] = kontakter
+            ws.update_cell(idx + 1, 5, json.dumps(data, ensure_ascii=False))
+            return
+    raise ValueError(f"Prosjekt {prosjekt_id} ikke funnet")
+
+
+# ---------------------------------------------------------------------------
 # Google Sheets – dokumenthåndtering (base64 i celler)
 # ---------------------------------------------------------------------------
 
