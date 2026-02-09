@@ -338,13 +338,14 @@ def etasjetillegg_prosent(d):
 if "steg" not in st.session_state:
     st.session_state.steg = 1
 
-# Gjenopprett lagrede verdier ved navigering tilbake.
-# Streamlit fjerner widget-nøkler når widgeten ikke rendres, men
-# _-prefiks-verdiene overlever. Kopier tilbake alle som mangler.
+# Gjenopprett lagrede verdier ved navigering mellom steg.
+# Når _navigert er satt, tving alle _-verdier over (stegbytte).
+# Ellers kopier kun de som mangler (normal rerun).
+_force = st.session_state.pop("_navigert", False)
 for _k in list(st.session_state.keys()):
     if _k.startswith("_") and not _k.startswith("__"):
         _navn = _k[1:]
-        if _navn not in st.session_state:
+        if _force or _navn not in st.session_state:
             st.session_state[_navn] = st.session_state[_k]
 
 STEG = ["Prosjekt", "Rommål", "Romdetaljer", "Tjeneste", "Oppsummering"]
@@ -663,6 +664,7 @@ if st.session_state.steg == 1:
                     st.session_state["_etasje"] = 1
                     st.session_state["_heis"] = "Ja"
                     st.session_state["_heis_valg"] = "Ja"
+                st.session_state["_navigert"] = True
                 st.session_state.steg = 2
                 st.rerun()
 
@@ -723,6 +725,7 @@ elif st.session_state.steg == 2:
     kol_v, kol_h = st.columns(2)
     with kol_v:
         if st.button("← Tilbake", use_container_width=True):
+            st.session_state["_navigert"] = True
             st.session_state.steg = 1
             st.rerun()
     with kol_h:
@@ -735,6 +738,7 @@ elif st.session_state.steg == 2:
             for nk in ["hoyde", "lopemeter", "gulvareal", "veggareal"]:
                 if nk in st.session_state:
                     st.session_state[f"_{nk}"] = st.session_state[nk]
+            st.session_state["_navigert"] = True
             st.session_state.steg = 3
             st.rerun()
 
@@ -935,6 +939,7 @@ elif st.session_state.steg == 3:
     kol_v, kol_h = st.columns(2)
     with kol_v:
         if st.button("← Tilbake", use_container_width=True):
+            st.session_state["_navigert"] = True
             st.session_state.steg = 2
             st.rerun()
     with kol_h:
@@ -963,6 +968,7 @@ elif st.session_state.steg == 3:
                     nk = f"{pfx}{i}"
                     if nk in st.session_state:
                         st.session_state[f"_{nk}"] = st.session_state[nk]
+            st.session_state["_navigert"] = True
             st.session_state.steg = 4
             st.rerun()
 
@@ -983,11 +989,13 @@ elif st.session_state.steg == 4:
     kol_v, kol_h = st.columns(2)
     with kol_v:
         if st.button("← Tilbake", use_container_width=True):
+            st.session_state["_navigert"] = True
             st.session_state.steg = 3
             st.rerun()
     with kol_h:
         if st.button("Se kalkyle →", use_container_width=True, type="primary"):
             st.session_state["_tjeneste"] = st.session_state.get("tjeneste", "Flisarbeider + tømrerarbeider")
+            st.session_state["_navigert"] = True
             st.session_state.steg = 5
             st.rerun()
 
@@ -1225,10 +1233,12 @@ elif st.session_state.steg == 5:
     kol_v, kol_m, kol_h = st.columns(3)
     with kol_v:
         if st.button("← Tilbake", use_container_width=True):
+            st.session_state["_navigert"] = True
             st.session_state.steg = 4
             st.rerun()
     with kol_m:
         if st.button("Rediger kalkyle", use_container_width=True):
+            st.session_state["_navigert"] = True
             st.session_state.steg = 1
             st.rerun()
     with kol_h:

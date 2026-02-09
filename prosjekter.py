@@ -163,6 +163,7 @@ def last_prosjekt(prosjekt):
 
     # Sjekk om prosjektet har kalkydata (mer enn bare adresse)
     har_kalkyle = any(k in data for k in ("_gulvareal", "_veggareal", "_flisomfang"))
+    st.session_state["_navigert"] = True
     if har_kalkyle:
         st.session_state["steg"] = 5
     else:
