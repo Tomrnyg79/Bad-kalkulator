@@ -193,6 +193,8 @@ def beregn_flisarbeider(d):
     f_gulv = FLIS["stor_flis_faktor"] if d.get("flis_str_gulv") == "60x120" else 1.0
     f_vegg = FLIS["stor_flis_faktor"] if d.get("flis_str_vegg") == "60x120" else 1.0
 
+    if d.get("avretting_undergulv"):
+        poster.append(p("Avretting av undergulv", gulv, "m²", FLIS["avretting_undergulv"]))
     poster.append(p("Gulvstøp", gulv, "m²", FLIS["gulvstop"]))
     if "Smøremembran" in d.get("membran_gulv_type", "Smøremembran"):
         poster.append(p("Smøremembran gulv", gulv, "m²", FLIS["membran_gulv"]))
@@ -788,6 +790,8 @@ elif st.session_state.steg == 3:
 
     st.radio("Membran gulv", ["Smøremembran", "Banemembran (ikke inkl. i pris)"], horizontal=True, key="membran_gulv_type")
 
+    st.checkbox("Avretting av undergulv (850 kr/m²)", key="avretting_undergulv")
+
     if "areal_dusjgulv" not in st.session_state:
         st.session_state.areal_dusjgulv = 1.0
     st.number_input("Areal dusjgulv (m²)", 0.0, 20.0, step=0.1, format="%.1f", key="areal_dusjgulv")
@@ -946,7 +950,7 @@ elif st.session_state.steg == 3:
                 "rigg_flis", "rigg_tomrer",
                 "flisomfang", "flisomfang_valg",
                 "flis_str_gulv", "flis_str_vegg", "finer_bak_gips",
-                "membran_gulv_type",
+                "membran_gulv_type", "avretting_undergulv",
                 "areal_dusjgulv", "antall_sluk",
                 "innvendige_hjorner", "utvendige_hjorner",
                 "hjorne_behandling", "hjorne_beh_valg",

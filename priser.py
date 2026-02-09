@@ -15,6 +15,7 @@ MVA_SATS = 0.25
 
 # --- Flisarbeider ---
 FLIS = {
+    "avretting_undergulv": 850,
     "gulvstop": 1350,
     "membran_vegg": 375,
     "membran_gulv": 750,
