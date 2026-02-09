@@ -450,22 +450,22 @@ if st.session_state.get("vis_dokumenter"):
     with st.expander("+ Legg til kontakt"):
         ny_rolle = st.selectbox("Rolle", _ROLLER, key="ny_kontakt_rolle")
 
-        # Hurtigvalg for roller med forhåndsdefinerte kontakter
-        valgt_person = None
+        # Hurtigvalg – autofyll navn/tlf ved valg
         if ny_rolle in _HURTIGVALG:
             personer = _HURTIGVALG[ny_rolle]
-            valg_liste = ["Velg..."] + [p["navn"] for p in personer] + ["Annen"]
-            valgt = st.selectbox("Hurtigvalg", valg_liste, key="ny_kontakt_hurtigvalg")
-            if valgt != "Velg..." and valgt != "Annen":
+            valg_liste = ["Skriv inn manuelt"] + [p["navn"] for p in personer]
+            valgt = st.selectbox("Velg person", valg_liste, key=f"ny_kontakt_hurtig_{ny_rolle}")
+            if valgt != "Skriv inn manuelt":
                 valgt_person = next(p for p in personer if p["navn"] == valgt)
+                st.session_state["ny_kontakt_navn"] = valgt_person["navn"]
+                st.session_state["ny_kontakt_tlf"] = valgt_person["tlf"]
+                st.session_state["ny_kontakt_epost"] = valgt_person.get("epost", "")
 
         nk1, nk2 = st.columns(2)
         with nk1:
-            default_navn = valgt_person["navn"] if valgt_person else ""
-            ny_navn = st.text_input("Navn", value=default_navn, key="ny_kontakt_navn")
+            ny_navn = st.text_input("Navn", key="ny_kontakt_navn")
         with nk2:
-            default_tlf = valgt_person["tlf"] if valgt_person else ""
-            ny_tlf = st.text_input("Telefon", value=default_tlf, key="ny_kontakt_tlf")
+            ny_tlf = st.text_input("Telefon", key="ny_kontakt_tlf")
         ny_epost = st.text_input("E-post", key="ny_kontakt_epost")
 
         if st.button("Legg til kontakt", type="primary", key="btn_ny_kontakt"):
