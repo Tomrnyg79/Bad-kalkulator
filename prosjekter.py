@@ -63,6 +63,33 @@ def lagre_prosjekt(bruker):
     return prosjekt_id
 
 
+def slett_prosjekt(prosjekt_id):
+    """Slett et prosjekt og tilhørende dokumenter fra Google Sheets."""
+    # Slett prosjektraden
+    ws = _get_worksheet()
+    alle = ws.get_all_values()
+    for idx, rad in enumerate(alle):
+        if idx == 0:
+            continue
+        if rad[0] == str(prosjekt_id):
+            ws.delete_rows(idx + 1)
+            break
+    # Slett tilhørende dokumenter
+    try:
+        dws = _get_doc_worksheet()
+        dok_alle = dws.get_all_values()
+        rader_å_slette = []
+        for idx, rad in enumerate(dok_alle):
+            if idx == 0:
+                continue
+            if len(rad) > 1 and rad[1] == str(prosjekt_id):
+                rader_å_slette.append(idx + 1)
+        for rad_nr in reversed(rader_å_slette):
+            dws.delete_rows(rad_nr)
+    except Exception:
+        pass  # OK om dokumenter-arket ikke finnes ennå
+
+
 def hent_alle_prosjekter():
     """Hent alle lagrede prosjekter. Returnerer liste med dicts, nyeste først."""
     ws = _get_worksheet()

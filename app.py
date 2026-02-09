@@ -5,7 +5,8 @@ import re
 from priser import FIRMA, MVA_SATS, FLIS, TOMRER, EPOXY_VALG
 from eksport import generer_pdf, generer_excel, send_epost, generer_tekst_dokument_pdf, generer_bilde_dokument_pdf
 from prosjekter import (lagre_prosjekt, hent_alle_prosjekter, last_prosjekt, sheets_er_konfigurert,
-                         lagre_dokument, hent_dokumenter, last_ned_dokument, slett_dokument, endre_dokumentnavn)
+                         slett_prosjekt, lagre_dokument, hent_dokumenter, last_ned_dokument,
+                         slett_dokument, endre_dokumentnavn)
 
 st.set_page_config(page_title="Baderoms kalkyle | Nygård Bad", page_icon="🛁", layout="centered")
 
@@ -88,17 +89,31 @@ with st.sidebar:
                 dato = proj.get("dato", "")
                 bruker = proj.get("bruker", "")
                 st.markdown(f"**{adr}**  \n{dato} – {bruker}")
-                btn_a, btn_d = st.columns(2)
+                btn_a, btn_d, btn_s = st.columns(3)
                 with btn_a:
                     if st.button("Åpne", key=f"open_{idx}", use_container_width=True):
                         last_prosjekt(proj)
                         st.rerun()
                 with btn_d:
-                    if st.button("Dokumenter", key=f"docs_{idx}", use_container_width=True):
+                    if st.button("Dok.", key=f"docs_{idx}", use_container_width=True):
                         st.session_state["prosjekt_id"] = proj.get("id", "")
                         st.session_state["dok_prosjekt_adresse"] = adr
                         st.session_state["vis_dokumenter"] = True
                         st.rerun()
+                with btn_s:
+                    bekreft_key = f"bekreft_slett_{idx}"
+                    if st.session_state.get(bekreft_key):
+                        if st.button("Bekreft?", key=f"slett2_{idx}", use_container_width=True, type="primary"):
+                            try:
+                                slett_prosjekt(proj.get("id", ""))
+                                del st.session_state[bekreft_key]
+                                st.rerun()
+                            except Exception as e:
+                                st.error(f"Feil: {e}")
+                    else:
+                        if st.button("Slett", key=f"slett_{idx}", use_container_width=True):
+                            st.session_state[bekreft_key] = True
+                            st.rerun()
         except Exception as e:
             st.caption(f"Kunne ikke hente prosjekter: {e}")
     else:
