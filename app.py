@@ -6,7 +6,7 @@ from priser import FIRMA, MVA_SATS, FLIS, TOMRER, EPOXY_VALG
 from eksport import generer_pdf, generer_excel, send_epost, generer_tekst_dokument_pdf, generer_bilde_dokument_pdf
 from prosjekter import (lagre_prosjekt, hent_alle_prosjekter, last_prosjekt, sheets_er_konfigurert,
                          slett_prosjekt, lagre_dokument, hent_dokumenter, last_ned_dokument,
-                         slett_dokument, endre_dokumentnavn)
+                         slett_dokument, endre_dokumentnavn, imap_er_konfigurert, sjekk_epost)
 
 st.set_page_config(page_title="Baderoms kalkyle | Nygård Bad", page_icon="🛁", layout="centered")
 
@@ -61,6 +61,21 @@ with st.sidebar:
             except Exception as e:
                 st.error(f"Kunne ikke lagre: {e}")
 
+    # Sjekk e-post for nye prosjekter
+    if imap_er_konfigurert():
+        if st.button("Sjekk e-post", use_container_width=True):
+            try:
+                nye = sjekk_epost()
+                if nye:
+                    st.success(f"Opprettet {len(nye)} prosjekt(er): {', '.join(nye)}")
+                    st.rerun()
+                else:
+                    st.info("Ingen nye e-poster.")
+            except Exception as e:
+                st.error(f"Kunne ikke sjekke e-post: {e}")
+
+    st.divider()
+
     # Delte brukergrupper – brukere i samme gruppe ser hverandres prosjekter
     DELTE_BRUKERE = [{"tom", "roy"}]
 
@@ -70,6 +85,11 @@ with st.sidebar:
         b = prosjekt_bruker.lower()
         if a == b:
             return True
+        # E-post-prosjekter er synlige for alle i en delt gruppe
+        if b == "e-post":
+            for gruppe in DELTE_BRUKERE:
+                if a in gruppe:
+                    return True
         for gruppe in DELTE_BRUKERE:
             if a in gruppe and b in gruppe:
                 return True

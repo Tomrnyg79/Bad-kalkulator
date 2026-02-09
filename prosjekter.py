@@ -238,3 +238,157 @@ def endre_dokumentnavn(doc_id, nytt_navn):
             continue
         if rad[0] == str(doc_id):
             ws.update_cell(idx + 1, 3, nytt_navn)  # kolonne 3 = doc_name
+
+
+# ---------------------------------------------------------------------------
+# IMAP – hent prosjekter fra e-post
+# ---------------------------------------------------------------------------
+
+import imaplib
+import email as email_lib
+from email.header import decode_header
+
+
+def _decode_header_value(val):
+    """Dekod e-post header-verdi (kan være encoded)."""
+    if val is None:
+        return ""
+    decoded_parts = decode_header(val)
+    result = ""
+    for part, charset in decoded_parts:
+        if isinstance(part, bytes):
+            result += part.decode(charset or "utf-8", errors="replace")
+        else:
+            result += part
+    return result
+
+
+def _rens_brodtekst(tekst):
+    """Fjern typiske videresendings-headere fra brødtekst."""
+    linjer = tekst.splitlines()
+    rensede = []
+    hopp_over = False
+    for linje in linjer:
+        stripped = linje.strip()
+        # Hopp over videresendings-header-linjer
+        if stripped.startswith("---------- Forwarded message") or stripped.startswith("---------- Videresendt melding"):
+            hopp_over = True
+            continue
+        if hopp_over:
+            # Hopp over From:/To:/Date:/Subject:-linjer etter forwarded header
+            if stripped and ":" in stripped[:20]:
+                lav = stripped.lower()
+                if any(lav.startswith(p) for p in ["from:", "to:", "date:", "subject:", "fra:", "til:", "dato:", "emne:", "sent:", "cc:"]):
+                    continue
+            hopp_over = False
+        rensede.append(linje)
+    return "\n".join(rensede).strip()
+
+
+def _hent_epost_tekst(msg):
+    """Hent ren tekst fra e-postmelding."""
+    if msg.is_multipart():
+        for part in msg.walk():
+            ct = part.get_content_type()
+            if ct == "text/plain" and "attachment" not in str(part.get("Content-Disposition", "")):
+                payload = part.get_payload(decode=True)
+                charset = part.get_content_charset() or "utf-8"
+                return payload.decode(charset, errors="replace")
+    else:
+        payload = msg.get_payload(decode=True)
+        charset = msg.get_content_charset() or "utf-8"
+        return payload.decode(charset, errors="replace")
+    return ""
+
+
+def _hent_pdf_vedlegg(msg):
+    """Hent alle PDF-vedlegg. Returnerer liste med (filnavn, bytes)."""
+    vedlegg = []
+    for part in msg.walk():
+        cd = part.get("Content-Disposition", "")
+        if "attachment" not in cd and "inline" not in cd:
+            continue
+        filnavn = part.get_filename()
+        if filnavn:
+            filnavn = _decode_header_value(filnavn)
+        if not filnavn:
+            continue
+        if filnavn.lower().endswith(".pdf"):
+            data = part.get_payload(decode=True)
+            if data:
+                vedlegg.append((filnavn, data))
+    return vedlegg
+
+
+def imap_er_konfigurert():
+    """Sjekk om IMAP er konfigurert i secrets."""
+    try:
+        return "imap" in st.secrets and "host" in st.secrets["imap"]
+    except Exception:
+        return False
+
+
+def sjekk_epost():
+    """Sjekk innboks for nye e-poster og opprett prosjekter.
+
+    Returnerer liste med opprettede prosjekt-adresser.
+    """
+    cfg = st.secrets["imap"]
+    opprettede = []
+
+    mail = imaplib.IMAP4_SSL(cfg["host"], int(cfg.get("port", 993)))
+    try:
+        mail.login(cfg["bruker"], cfg["passord"])
+        mail.select("INBOX")
+
+        _, meldinger = mail.search(None, "UNSEEN")
+        for num in meldinger[0].split():
+            if not num:
+                continue
+            _, data = mail.fetch(num, "(RFC822)")
+            raw = data[0][1]
+            msg = email_lib.message_from_bytes(raw)
+
+            # Emne = prosjektadresse
+            emne = _decode_header_value(msg.get("Subject", ""))
+            # Fjern "Fwd:", "Vs:", "Re:" etc.
+            adresse = emne
+            for prefiks in ["Fwd:", "FWD:", "Vs:", "VS:", "Re:", "RE:", "Sv:", "SV:"]:
+                if adresse.startswith(prefiks):
+                    adresse = adresse[len(prefiks):]
+            adresse = adresse.strip()
+            if not adresse:
+                adresse = "Ukjent adresse"
+
+            # Brødtekst = prosjektbeskrivelse
+            brodtekst = _hent_epost_tekst(msg)
+            brodtekst = _rens_brodtekst(brodtekst)
+
+            # PDF-vedlegg
+            vedlegg = _hent_pdf_vedlegg(msg)
+
+            # Opprett prosjekt
+            ws = _get_worksheet()
+            prosjekt_id = str(uuid.uuid4())[:8]
+            dato = datetime.datetime.now().strftime("%d.%m.%Y %H:%M")
+            json_data = json.dumps({"_adresse": adresse}, ensure_ascii=False)
+            ws.append_row([prosjekt_id, adresse, dato, "e-post", json_data])
+
+            # Lagre brødtekst som tekstdokument
+            if brodtekst.strip():
+                from eksport import generer_tekst_dokument_pdf
+                pdf_bytes = generer_tekst_dokument_pdf("Prosjektbeskrivelse", brodtekst)
+                lagre_dokument(prosjekt_id, "Prosjektbeskrivelse", pdf_bytes)
+
+            # Lagre PDF-vedlegg som dokumenter
+            for filnavn, pdf_data in vedlegg:
+                navn = filnavn.replace(".pdf", "").replace(".PDF", "")
+                lagre_dokument(prosjekt_id, navn, pdf_data)
+
+            # Marker som lest
+            mail.store(num, "+FLAGS", "\\Seen")
+            opprettede.append(adresse)
+    finally:
+        mail.logout()
+
+    return opprettede
