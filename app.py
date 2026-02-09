@@ -315,49 +315,7 @@ if st.session_state.get("vis_dokumenter"):
         st.warning("Ingen prosjekt-ID funnet.")
         st.stop()
 
-    # --- Legg til tekstdokument ---
-    st.markdown("#### Legg til tekstdokument")
-    dok_tekst_navn = st.text_input("Dokumentnavn", value="Prosjektbeskrivelse", key="dok_tekst_navn")
-    dok_tekst_innhold = st.text_area("Innhold", height=200, key="dok_tekst_innhold",
-                                      placeholder="Skriv inn tekst her...")
-    if st.button("Opprett tekstdokument", type="primary"):
-        if not dok_tekst_innhold.strip():
-            st.error("Skriv inn tekst først.")
-        else:
-            try:
-                pdf_bytes = generer_tekst_dokument_pdf(dok_tekst_navn, dok_tekst_innhold)
-                lagre_dokument(prosjekt_id, dok_tekst_navn, pdf_bytes)
-                st.success(f"Dokumentet «{dok_tekst_navn}» er opprettet!")
-                st.rerun()
-            except Exception as e:
-                st.error(f"Kunne ikke opprette dokument: {e}")
-
-    st.divider()
-
-    # --- Legg til bilder som PDF ---
-    st.markdown("#### Legg til bilder som PDF")
-    dok_bilde_navn = st.text_input("Dokumentnavn", value="Bilder", key="dok_bilde_navn")
-    opplastede_bilder = st.file_uploader(
-        "Last opp bilder", type=["jpg", "jpeg", "png"],
-        accept_multiple_files=True, key="dok_bilder",
-    )
-    if st.button("Opprett bildedokument", type="primary", key="btn_opprett_bilde"):
-        if not opplastede_bilder:
-            st.error("Last opp minst ett bilde først.")
-        else:
-            try:
-                bilder = [(f.name, f.getvalue()) for f in opplastede_bilder]
-                pdf_bytes = generer_bilde_dokument_pdf(dok_bilde_navn, bilder)
-                lagre_dokument(prosjekt_id, dok_bilde_navn, pdf_bytes)
-                st.success(f"Bildedokumentet «{dok_bilde_navn}» er opprettet!")
-                st.rerun()
-            except Exception as e:
-                st.error(f"Kunne ikke opprette bildedokument: {e}")
-
-    st.divider()
-
-    # --- Dokumentliste ---
-    st.markdown("#### Lagrede dokumenter")
+    # --- Dokumentliste (øverst) ---
     try:
         dok_liste = hent_dokumenter(prosjekt_id)
         if not dok_liste:
@@ -391,7 +349,6 @@ if st.session_state.get("vis_dokumenter"):
                     except Exception as e:
                         st.error(f"Kunne ikke slette: {e}")
 
-            # Rename-felt (vises når brukeren klikker "Gi nytt navn")
             if st.session_state.get(f"renaming_{doc_id}"):
                 nytt = st.text_input("Nytt navn", value=doc_name.replace(".pdf", ""), key=f"newname_{doc_id}")
                 rk1, rk2 = st.columns(2)
@@ -412,6 +369,71 @@ if st.session_state.get("vis_dokumenter"):
             st.divider()
     except Exception as e:
         st.error(f"Kunne ikke hente dokumenter: {e}")
+
+    # --- Legg til nytt dokument (ekspanderbar) ---
+    with st.expander("+ Legg til nytt dokument"):
+
+        dok_type = st.radio("Type", ["Last opp fil (PDF/bilder)", "Skriv tekstdokument"],
+                            horizontal=True, key="dok_type_valg")
+
+        if dok_type == "Last opp fil (PDF/bilder)":
+            dok_fil_navn = st.text_input("Dokumentnavn", value="", key="dok_fil_navn",
+                                          placeholder="F.eks. Plantegning")
+            opplastede_filer = st.file_uploader(
+                "Last opp filer", type=["jpg", "jpeg", "png", "pdf"],
+                accept_multiple_files=True, key="dok_filer",
+            )
+            if st.button("Lagre dokument", type="primary", key="btn_opprett_fil"):
+                if not opplastede_filer:
+                    st.error("Last opp minst én fil først.")
+                elif not dok_fil_navn.strip():
+                    st.error("Gi dokumentet et navn.")
+                else:
+                    try:
+                        # Sjekk om det er kun én PDF-fil → lagre direkte
+                        if (len(opplastede_filer) == 1
+                                and opplastede_filer[0].name.lower().endswith(".pdf")):
+                            pdf_bytes = opplastede_filer[0].getvalue()
+                        else:
+                            # Filtrer ut bilder og PDFer separat
+                            bilder = []
+                            pdf_deler = []
+                            for f in opplastede_filer:
+                                if f.name.lower().endswith(".pdf"):
+                                    pdf_deler.append(f.getvalue())
+                                else:
+                                    bilder.append((f.name, f.getvalue()))
+                            if bilder:
+                                pdf_bytes = generer_bilde_dokument_pdf(dok_fil_navn, bilder)
+                            elif pdf_deler:
+                                pdf_bytes = pdf_deler[0]
+                            else:
+                                st.error("Ingen gyldige filer funnet.")
+                                st.stop()
+                        lagre_dokument(prosjekt_id, dok_fil_navn, pdf_bytes)
+                        st.success(f"«{dok_fil_navn}» er lagret!")
+                        st.rerun()
+                    except Exception as e:
+                        st.error(f"Kunne ikke lagre dokument: {e}")
+
+        else:  # Tekstdokument
+            dok_tekst_navn = st.text_input("Dokumentnavn", value="", key="dok_tekst_navn",
+                                            placeholder="F.eks. Prosjektbeskrivelse")
+            dok_tekst_innhold = st.text_area("Innhold", height=200, key="dok_tekst_innhold",
+                                              placeholder="Skriv inn tekst her...")
+            if st.button("Lagre dokument", type="primary", key="btn_opprett_tekst"):
+                if not dok_tekst_innhold.strip():
+                    st.error("Skriv inn tekst først.")
+                elif not dok_tekst_navn.strip():
+                    st.error("Gi dokumentet et navn.")
+                else:
+                    try:
+                        pdf_bytes = generer_tekst_dokument_pdf(dok_tekst_navn, dok_tekst_innhold)
+                        lagre_dokument(prosjekt_id, dok_tekst_navn, pdf_bytes)
+                        st.success(f"«{dok_tekst_navn}» er opprettet!")
+                        st.rerun()
+                    except Exception as e:
+                        st.error(f"Kunne ikke opprette dokument: {e}")
 
     st.stop()
 
