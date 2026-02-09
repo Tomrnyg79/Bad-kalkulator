@@ -190,8 +190,8 @@ def beregn_flisarbeider(d):
     vegg = d.get("veggareal", 0)
     lm = d.get("lopemeter", 0)
     vegg_og_gulv = d.get("flisomfang") == "Vegg og gulv"
-    f_gulv = FLIS["stor_flis_faktor"] if d.get("flis_str_gulv") == "60x120" else 1.0
-    f_vegg = FLIS["stor_flis_faktor"] if d.get("flis_str_vegg") == "60x120" else 1.0
+    _str_gulv = d.get("flis_str_gulv", "60x60")
+    _str_vegg = d.get("flis_str_vegg", "60x60")
 
     if d.get("avretting_undergulv"):
         poster.append(p("Avretting av undergulv", gulv, "m²", FLIS["avretting_undergulv"]))
@@ -202,12 +202,22 @@ def beregn_flisarbeider(d):
     if vegg_og_gulv:
         poster.append(p("Membran vegg", vegg, "m²", FLIS["membran_vegg"]))
 
-    pris_gulv = FLIS["flis_gulv_base"] * f_gulv
-    poster.append(p(f"Flislegging gulv ({d.get('flis_str_gulv', '60x60')})", gulv, "m²", pris_gulv))
+    if _str_gulv == "60x120":
+        pris_gulv = FLIS["flis_gulv_base"] * FLIS["stor_flis_faktor"]
+    elif _str_gulv == "30x60":
+        pris_gulv = FLIS["flis_gulv_base"] + 200
+    else:
+        pris_gulv = FLIS["flis_gulv_base"]
+    poster.append(p(f"Flislegging gulv ({_str_gulv})", gulv, "m²", pris_gulv))
 
     if vegg_og_gulv:
-        pris_vegg = FLIS["flis_vegg_base"] * f_vegg
-        poster.append(p(f"Flislegging vegg ({d.get('flis_str_vegg', '60x60')})", vegg, "m²", pris_vegg))
+        if _str_vegg == "60x120":
+            pris_vegg = FLIS["flis_vegg_base"] * FLIS["stor_flis_faktor"]
+        elif _str_vegg == "30x60":
+            pris_vegg = 1250
+        else:
+            pris_vegg = FLIS["flis_vegg_base"]
+        poster.append(p(f"Flislegging vegg ({_str_vegg})", vegg, "m²", pris_vegg))
     else:
         poster.append(p("Sokkelflis", lm, "lm", FLIS["sokkelflis"]))
 
@@ -770,7 +780,7 @@ elif st.session_state.steg == 3:
     flisomfang = "Vegg og gulv" if "Vegg og gulv" in st.session_state.get("flisomfang_valg", "") else "Kun gulv"
     st.session_state["flisomfang"] = flisomfang
 
-    flis_str = ["20x20", "30x30", "60x60", "60x120"]
+    flis_str = ["20x20", "30x30", "30x60", "60x60", "60x120"]
     k1, k2 = st.columns(2)
     with k1:
         if "flis_str_gulv" not in st.session_state:
