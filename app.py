@@ -3,8 +3,9 @@ import datetime
 import re
 
 from priser import FIRMA, MVA_SATS, FLIS, TOMRER, EPOXY_VALG
-from eksport import generer_pdf, generer_excel, send_epost
-from prosjekter import lagre_prosjekt, hent_alle_prosjekter, last_prosjekt, sheets_er_konfigurert
+from eksport import generer_pdf, generer_excel, send_epost, generer_tekst_dokument_pdf, generer_bilde_dokument_pdf
+from prosjekter import (lagre_prosjekt, hent_alle_prosjekter, last_prosjekt, sheets_er_konfigurert,
+                         lagre_dokument, hent_dokumenter, last_ned_dokument, slett_dokument, endre_dokumentnavn)
 
 st.set_page_config(page_title="Baderoms kalkyle | Nygård Bad", page_icon="🛁", layout="centered")
 
@@ -54,6 +55,7 @@ with st.sidebar:
         if st.button("Lagre prosjekt", use_container_width=True, type="primary"):
             try:
                 pid = lagre_prosjekt(st.session_state.bruker)
+                st.session_state["prosjekt_id"] = pid
                 st.success(f"Prosjekt lagret! (ID: {pid})")
             except Exception as e:
                 st.error(f"Kunne ikke lagre: {e}")
@@ -86,9 +88,17 @@ with st.sidebar:
                 dato = proj.get("dato", "")
                 bruker = proj.get("bruker", "")
                 st.markdown(f"**{adr}**  \n{dato} – {bruker}")
-                if st.button("Åpne", key=f"open_{idx}", use_container_width=True):
-                    last_prosjekt(proj)
-                    st.rerun()
+                btn_a, btn_d = st.columns(2)
+                with btn_a:
+                    if st.button("Åpne", key=f"open_{idx}", use_container_width=True):
+                        last_prosjekt(proj)
+                        st.rerun()
+                with btn_d:
+                    if st.button("Dokumenter", key=f"docs_{idx}", use_container_width=True):
+                        st.session_state["prosjekt_id"] = proj.get("id", "")
+                        st.session_state["dok_prosjekt_adresse"] = adr
+                        st.session_state["vis_dokumenter"] = True
+                        st.rerun()
         except Exception as e:
             st.caption(f"Kunne ikke hente prosjekter: {e}")
     else:
@@ -286,6 +296,128 @@ st.markdown(
     unsafe_allow_html=True,
 )
 
+# ===================================================================
+# DOKUMENTVISNING (separat fra kalkyle-stegene)
+# ===================================================================
+if st.session_state.get("vis_dokumenter"):
+    prosjekt_id = st.session_state.get("prosjekt_id", "")
+    dok_adresse = st.session_state.get("dok_prosjekt_adresse", "Ukjent prosjekt")
+
+    st.markdown(f"### Dokumenter – {dok_adresse}")
+
+    if st.button("← Tilbake til kalkyle", use_container_width=False):
+        st.session_state["vis_dokumenter"] = False
+        st.rerun()
+
+    st.divider()
+
+    if not prosjekt_id:
+        st.warning("Ingen prosjekt-ID funnet.")
+        st.stop()
+
+    # --- Legg til tekstdokument ---
+    st.markdown("#### Legg til tekstdokument")
+    dok_tekst_navn = st.text_input("Dokumentnavn", value="Prosjektbeskrivelse", key="dok_tekst_navn")
+    dok_tekst_innhold = st.text_area("Innhold", height=200, key="dok_tekst_innhold",
+                                      placeholder="Skriv inn tekst her...")
+    if st.button("Opprett tekstdokument", type="primary"):
+        if not dok_tekst_innhold.strip():
+            st.error("Skriv inn tekst først.")
+        else:
+            try:
+                pdf_bytes = generer_tekst_dokument_pdf(dok_tekst_navn, dok_tekst_innhold)
+                lagre_dokument(prosjekt_id, dok_tekst_navn, pdf_bytes)
+                st.success(f"Dokumentet «{dok_tekst_navn}» er opprettet!")
+                st.rerun()
+            except Exception as e:
+                st.error(f"Kunne ikke opprette dokument: {e}")
+
+    st.divider()
+
+    # --- Legg til bilder som PDF ---
+    st.markdown("#### Legg til bilder som PDF")
+    dok_bilde_navn = st.text_input("Dokumentnavn", value="Bilder", key="dok_bilde_navn")
+    opplastede_bilder = st.file_uploader(
+        "Last opp bilder", type=["jpg", "jpeg", "png"],
+        accept_multiple_files=True, key="dok_bilder",
+    )
+    if st.button("Opprett bildedokument", type="primary", key="btn_opprett_bilde"):
+        if not opplastede_bilder:
+            st.error("Last opp minst ett bilde først.")
+        else:
+            try:
+                bilder = [(f.name, f.getvalue()) for f in opplastede_bilder]
+                pdf_bytes = generer_bilde_dokument_pdf(dok_bilde_navn, bilder)
+                lagre_dokument(prosjekt_id, dok_bilde_navn, pdf_bytes)
+                st.success(f"Bildedokumentet «{dok_bilde_navn}» er opprettet!")
+                st.rerun()
+            except Exception as e:
+                st.error(f"Kunne ikke opprette bildedokument: {e}")
+
+    st.divider()
+
+    # --- Dokumentliste ---
+    st.markdown("#### Lagrede dokumenter")
+    try:
+        dok_liste = hent_dokumenter(prosjekt_id)
+        if not dok_liste:
+            st.caption("Ingen dokumenter ennå.")
+        for doc in dok_liste:
+            doc_id = doc["id"]
+            doc_name = doc["name"]
+            created = doc.get("createdTime", "")[:10]  # YYYY-MM-DD
+
+            st.markdown(f"**{doc_name}**  \n*{created}*")
+            dk1, dk2, dk3 = st.columns(3)
+            with dk1:
+                try:
+                    doc_bytes = last_ned_dokument(doc_id)
+                    st.download_button(
+                        "Last ned", doc_bytes, file_name=doc_name,
+                        mime="application/pdf", key=f"dl_{doc_id}",
+                        use_container_width=True,
+                    )
+                except Exception:
+                    st.button("Last ned", key=f"dl_{doc_id}", disabled=True, use_container_width=True)
+            with dk2:
+                if st.button("Gi nytt navn", key=f"ren_{doc_id}", use_container_width=True):
+                    st.session_state[f"renaming_{doc_id}"] = True
+            with dk3:
+                if st.button("Slett", key=f"del_{doc_id}", use_container_width=True):
+                    try:
+                        slett_dokument(doc_id)
+                        st.success(f"«{doc_name}» slettet.")
+                        st.rerun()
+                    except Exception as e:
+                        st.error(f"Kunne ikke slette: {e}")
+
+            # Rename-felt (vises når brukeren klikker "Gi nytt navn")
+            if st.session_state.get(f"renaming_{doc_id}"):
+                nytt = st.text_input("Nytt navn", value=doc_name.replace(".pdf", ""), key=f"newname_{doc_id}")
+                rk1, rk2 = st.columns(2)
+                with rk1:
+                    if st.button("Lagre navn", key=f"savename_{doc_id}", use_container_width=True):
+                        try:
+                            endre_dokumentnavn(doc_id, nytt)
+                            del st.session_state[f"renaming_{doc_id}"]
+                            st.success(f"Omdøpt til «{nytt}.pdf»")
+                            st.rerun()
+                        except Exception as e:
+                            st.error(f"Kunne ikke endre navn: {e}")
+                with rk2:
+                    if st.button("Avbryt", key=f"cancelname_{doc_id}", use_container_width=True):
+                        del st.session_state[f"renaming_{doc_id}"]
+                        st.rerun()
+
+            st.divider()
+    except Exception as e:
+        st.error(f"Kunne ikke hente dokumenter: {e}")
+
+    st.stop()
+
+# ===================================================================
+# KALKYLE-STEG (vises kun når vis_dokumenter er False/ikke satt)
+# ===================================================================
 fremdrift = (st.session_state.steg - 1) / (len(STEG) - 1)
 st.progress(fremdrift)
 st.markdown(f"**Steg {st.session_state.steg} av {len(STEG)}: {STEG[st.session_state.steg - 1]}**")

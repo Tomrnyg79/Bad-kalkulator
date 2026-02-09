@@ -346,3 +346,106 @@ def send_epost(mottaker, emne, brødtekst, vedlegg, smtp_config):
         server.starttls()
         server.login(smtp_config["bruker"], smtp_config["passord"])
         server.send_message(msg)
+
+
+# ---------------------------------------------------------------------------
+# Dokument-PDFer (tekst og bilder)
+# ---------------------------------------------------------------------------
+
+def generer_tekst_dokument_pdf(tittel, tekst):
+    """Generer en enkel PDF med tittel og brødtekst."""
+    pdf = FPDF()
+    pdf.add_page()
+    pdf.set_auto_page_break(auto=True, margin=15)
+
+    # Firmaheader
+    pdf.set_font("Helvetica", "B", 16)
+    if _LOGO.exists():
+        pdf.image(str(_LOGO), x=10, y=10, w=40)
+        pdf.set_y(10)
+        pdf.cell(45)
+    pdf.cell(0, 8, FIRMA["navn"], new_x="LMARGIN", new_y="NEXT")
+    if _LOGO.exists():
+        pdf.set_x(55)
+    pdf.set_font("Helvetica", "", 8)
+    pdf.cell(0, 4, f"Org.nr: {FIRMA['orgnr']}  |  Tlf: {FIRMA['telefon']}", new_x="LMARGIN", new_y="NEXT")
+    if _LOGO.exists():
+        pdf.set_y(max(pdf.get_y(), 35))
+    pdf.ln(3)
+    pdf.set_draw_color(180, 180, 180)
+    pdf.line(10, pdf.get_y(), 200, pdf.get_y())
+    pdf.ln(8)
+
+    # Tittel
+    pdf.set_font("Helvetica", "B", 14)
+    pdf.cell(0, 10, tittel, new_x="LMARGIN", new_y="NEXT")
+    pdf.ln(4)
+
+    # Dato
+    pdf.set_font("Helvetica", "", 9)
+    pdf.set_text_color(120, 120, 120)
+    pdf.cell(0, 5, datetime.date.today().strftime("%d.%m.%Y"), new_x="LMARGIN", new_y="NEXT")
+    pdf.set_text_color(0, 0, 0)
+    pdf.ln(4)
+
+    # Brødtekst
+    pdf.set_font("Helvetica", "", 11)
+    pdf.multi_cell(0, 6, tekst)
+
+    return bytes(pdf.output())
+
+
+def generer_bilde_dokument_pdf(tittel, bilder):
+    """Generer en PDF med bilder. bilder: liste med (filnavn, bytes) tupler."""
+    from PIL import Image
+
+    pdf = FPDF()
+    pdf.set_auto_page_break(auto=True, margin=15)
+
+    for idx, (bilde_navn, bilde_bytes) in enumerate(bilder):
+        pdf.add_page()
+
+        if idx == 0:
+            # Tittel på første side
+            pdf.set_font("Helvetica", "B", 14)
+            pdf.cell(0, 10, tittel, new_x="LMARGIN", new_y="NEXT")
+            pdf.set_font("Helvetica", "", 9)
+            pdf.set_text_color(120, 120, 120)
+            pdf.cell(0, 5, datetime.date.today().strftime("%d.%m.%Y"), new_x="LMARGIN", new_y="NEXT")
+            pdf.set_text_color(0, 0, 0)
+            pdf.ln(4)
+
+        # Last bilde med Pillow for å få dimensjoner
+        img = Image.open(io.BytesIO(bilde_bytes))
+        img_w, img_h = img.size
+
+        # Tilgjengelig bredde/høyde på siden
+        maks_b = 190  # mm (A4 bredde minus marginer)
+        maks_h = 260 if idx == 0 else 277  # reduser for tittel på første side
+
+        # Skaler til å passe på siden
+        ratio = min(maks_b / (img_w * 0.264583), maks_h / (img_h * 0.264583))
+        vis_b = img_w * 0.264583 * ratio  # px til mm
+        vis_h = img_h * 0.264583 * ratio
+
+        # Sentrér horisontalt
+        x = 10 + (maks_b - vis_b) / 2
+
+        # Skriv bildet til en temp-buffer i et format fpdf2 kan lese
+        img_buf = io.BytesIO()
+        fmt = "JPEG"
+        if img.mode == "RGBA":
+            fmt = "PNG"
+        img.save(img_buf, format=fmt)
+        img_buf.seek(0)
+
+        pdf.image(img_buf, x=x, y=pdf.get_y(), w=vis_b)
+
+        # Bildetekst under bildet
+        pdf.set_y(pdf.get_y() + vis_h + 2)
+        pdf.set_font("Helvetica", "I", 8)
+        pdf.set_text_color(100, 100, 100)
+        pdf.cell(0, 4, bilde_navn, align="C", new_x="LMARGIN", new_y="NEXT")
+        pdf.set_text_color(0, 0, 0)
+
+    return bytes(pdf.output())
