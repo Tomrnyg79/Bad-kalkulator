@@ -58,11 +58,27 @@ with st.sidebar:
             except Exception as e:
                 st.error(f"Kunne ikke lagre: {e}")
 
+    # Delte brukergrupper – brukere i samme gruppe ser hverandres prosjekter
+    DELTE_BRUKERE = [{"tom", "roy"}]
+
+    def _synlig_for(innlogget, prosjekt_bruker):
+        """Sjekk om innlogget bruker skal se prosjektet til prosjekt_bruker."""
+        a = innlogget.lower()
+        b = prosjekt_bruker.lower()
+        if a == b:
+            return True
+        for gruppe in DELTE_BRUKERE:
+            if a in gruppe and b in gruppe:
+                return True
+        return False
+
     # Liste over lagrede prosjekter
     if sheets_er_konfigurert():
         st.markdown("#### Lagrede prosjekter")
         try:
             prosjekter = hent_alle_prosjekter()
+            innlogget_bruker = st.session_state.get("bruker", "")
+            prosjekter = [p for p in prosjekter if _synlig_for(innlogget_bruker, p.get("bruker", ""))]
             if not prosjekter:
                 st.caption("Ingen lagrede prosjekter ennå.")
             for idx, proj in enumerate(prosjekter):
@@ -522,6 +538,45 @@ elif st.session_state.steg == 3:
         st.session_state.epoxy_valg = "Ikke inkludert"
     st.selectbox("Epoxyfug", list(EPOXY_VALG.keys()), key="epoxy_valg")
 
+    # --- Egendefinerte poster ---
+    st.divider()
+    st.markdown("#### Egendefinerte poster")
+
+    if "antall_egendefinerte" not in st.session_state:
+        st.session_state.antall_egendefinerte = 0
+
+    for i in range(st.session_state.antall_egendefinerte):
+        st.markdown(f"**Post {i + 1}**")
+        ek1, ek2, ek3 = st.columns([1, 2, 1])
+        with ek1:
+            if f"ep_kat_{i}" not in st.session_state:
+                st.session_state[f"ep_kat_{i}"] = "Flisarbeider"
+            st.selectbox("Kategori", ["Flisarbeider", "Tømrerarbeider"], key=f"ep_kat_{i}", label_visibility="collapsed")
+        with ek2:
+            if f"ep_beskr_{i}" not in st.session_state:
+                st.session_state[f"ep_beskr_{i}"] = ""
+            st.text_input("Beskrivelse", key=f"ep_beskr_{i}", placeholder="Beskrivelse", label_visibility="collapsed")
+        with ek3:
+            if f"ep_pris_{i}" not in st.session_state:
+                st.session_state[f"ep_pris_{i}"] = 0
+            st.number_input("Pris", min_value=0, step=100, key=f"ep_pris_{i}", label_visibility="collapsed")
+
+    ep_pluss, ep_minus, _ = st.columns([1, 1, 2])
+    with ep_pluss:
+        if st.button("+ Legg til post", use_container_width=True):
+            st.session_state.antall_egendefinerte += 1
+            st.rerun()
+    with ep_minus:
+        if st.session_state.antall_egendefinerte > 0:
+            if st.button("- Fjern siste", use_container_width=True):
+                siste_i = st.session_state.antall_egendefinerte - 1
+                for pfx in ("ep_kat_", "ep_beskr_", "ep_pris_"):
+                    nk = f"{pfx}{siste_i}"
+                    if nk in st.session_state:
+                        del st.session_state[nk]
+                st.session_state.antall_egendefinerte -= 1
+                st.rerun()
+
     # --- Nav ---
     st.divider()
     kol_v, kol_h = st.columns(2)
@@ -542,9 +597,16 @@ elif st.session_state.steg == 3:
                 "antall_nisjer", "nisje_beh",
                 "antall_cisternekasser", "cisternekasse_beh",
                 "epoxy_valg",
+                "antall_egendefinerte",
             ]:
                 if nk in st.session_state:
                     st.session_state[f"_{nk}"] = st.session_state[nk]
+            # Lagre egendefinerte poster
+            for i in range(st.session_state.get("antall_egendefinerte", 0)):
+                for pfx in ("ep_kat_", "ep_beskr_", "ep_pris_"):
+                    nk = f"{pfx}{i}"
+                    if nk in st.session_state:
+                        st.session_state[f"_{nk}"] = st.session_state[nk]
             st.session_state.steg = 4
             st.rerun()
 
@@ -603,6 +665,18 @@ elif st.session_state.steg == 5:
 
     flis_poster = beregn_flisarbeider(d) if vis_flis else []
     tomrer_poster = beregn_tomrerarbeid(d) if vis_tomrer else []
+
+    # Legg til egendefinerte poster i riktig kategori
+    for i in range(int(d.get("antall_egendefinerte", 0))):
+        kat = d.get(f"ep_kat_{i}", "Flisarbeider")
+        beskr = d.get(f"ep_beskr_{i}", "")
+        pris = d.get(f"ep_pris_{i}", 0)
+        if beskr and pris:
+            post = (beskr, 1, "stk", pris, round(pris))
+            if kat == "Flisarbeider" and vis_flis:
+                flis_poster.append(post)
+            elif kat == "Tømrerarbeider" and vis_tomrer:
+                tomrer_poster.append(post)
 
     def vis_poster(tittel, poster):
         st.markdown(f"### {tittel}")
