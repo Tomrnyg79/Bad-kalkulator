@@ -205,6 +205,10 @@ def beregn_tomrerarbeid(d):
     if sky > 0:
         poster.append(p("Skyvedør komplett", sky, "stk", TOMRER["skyvedor"]))
 
+    lister = d.get("antall_kun_nye_lister", 0)
+    if lister > 0:
+        poster.append(p("Kun nye lister", lister, "stk", TOMRER["kun_nye_lister"]))
+
     nisjer = d.get("antall_nisjer", 0)
     if nisjer > 0:
         poster.append(p("Nisje tømrer", nisjer, "stk", TOMRER["nisje"]))
@@ -475,6 +479,10 @@ elif st.session_state.steg == 3:
             st.session_state.antall_skyvedorer = 0
         st.number_input("Skyvedører", 0, 10, step=1, key="antall_skyvedorer")
 
+    if "antall_kun_nye_lister" not in st.session_state:
+        st.session_state.antall_kun_nye_lister = 0
+    st.number_input("Kun nye lister", 0, 20, step=1, key="antall_kun_nye_lister")
+
     st.divider()
 
     # --- Nisjer og annet ---
@@ -527,7 +535,7 @@ elif st.session_state.steg == 3:
                 "areal_dusjgulv", "antall_sluk",
                 "innvendige_hjorner", "utvendige_hjorner", "hjorne_behandling",
                 "isolering_vegg", "isolering_tak", "paforing_vegg",
-                "antall_innerdorer", "antall_skyvedorer",
+                "antall_innerdorer", "antall_skyvedorer", "antall_kun_nye_lister",
                 "antall_nisjer", "nisje_beh",
                 "antall_cisternekasser", "cisternekasse_beh",
                 "epoxy_valg",

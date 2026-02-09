@@ -55,6 +55,7 @@ TOMRER = {
     "min_tak": 2000,
     "innerdor": 2640,
     "skyvedor": 3300,
+    "kun_nye_lister": 850,
     "nisje": 1900,
     "utvendig_hjorne": 750,
     "ekstra_innvendig_hjorne": 250,
