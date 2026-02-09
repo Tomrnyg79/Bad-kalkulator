@@ -395,6 +395,67 @@ def generer_tekst_dokument_pdf(tittel, tekst):
     return bytes(pdf.output())
 
 
+def generer_kontaktliste_pdf(adresse, kontakter):
+    """Generer en PDF med kontaktliste for et prosjekt."""
+    pdf = FPDF()
+    pdf.add_page()
+    pdf.set_auto_page_break(auto=True, margin=15)
+
+    # Firmaheader
+    pdf.set_font("Helvetica", "B", 16)
+    if _LOGO.exists():
+        pdf.image(str(_LOGO), x=10, y=10, w=40)
+        pdf.set_y(10)
+        pdf.cell(45)
+    pdf.cell(0, 8, FIRMA["navn"], new_x="LMARGIN", new_y="NEXT")
+    if _LOGO.exists():
+        pdf.set_x(55)
+    pdf.set_font("Helvetica", "", 8)
+    pdf.cell(0, 4, f"Org.nr: {FIRMA['orgnr']}  |  Tlf: {FIRMA['telefon']}", new_x="LMARGIN", new_y="NEXT")
+    if _LOGO.exists():
+        pdf.set_y(max(pdf.get_y(), 35))
+    pdf.ln(3)
+    pdf.set_draw_color(180, 180, 180)
+    pdf.line(10, pdf.get_y(), 200, pdf.get_y())
+    pdf.ln(8)
+
+    # Tittel
+    pdf.set_font("Helvetica", "B", 14)
+    pdf.cell(0, 10, f"Kontaktliste - {adresse}", new_x="LMARGIN", new_y="NEXT")
+    pdf.ln(2)
+    pdf.set_font("Helvetica", "", 9)
+    pdf.set_text_color(120, 120, 120)
+    pdf.cell(0, 5, datetime.date.today().strftime("%d.%m.%Y"), new_x="LMARGIN", new_y="NEXT")
+    pdf.set_text_color(0, 0, 0)
+    pdf.ln(6)
+
+    # Kontakter
+    for kont in kontakter:
+        rolle = kont.get("rolle", "")
+        navn = kont.get("navn", "")
+        tlf = kont.get("tlf", "")
+        epost = kont.get("epost", "")
+
+        pdf.set_font("Helvetica", "B", 11)
+        pdf.cell(0, 7, rolle, new_x="LMARGIN", new_y="NEXT")
+        pdf.set_font("Helvetica", "", 11)
+        pdf.cell(0, 6, f"Navn: {navn}", new_x="LMARGIN", new_y="NEXT")
+        if tlf:
+            pdf.cell(0, 6, f"Tlf: {tlf}", new_x="LMARGIN", new_y="NEXT")
+        if epost:
+            pdf.cell(0, 6, f"E-post: {epost}", new_x="LMARGIN", new_y="NEXT")
+        pdf.ln(4)
+        pdf.set_draw_color(220, 220, 220)
+        pdf.line(10, pdf.get_y(), 200, pdf.get_y())
+        pdf.ln(4)
+
+    if not kontakter:
+        pdf.set_font("Helvetica", "I", 11)
+        pdf.cell(0, 7, "Ingen kontakter registrert.", new_x="LMARGIN", new_y="NEXT")
+
+    return bytes(pdf.output())
+
+
 def generer_bilde_dokument_pdf(tittel, bilder):
     """Generer en PDF med bilder. bilder: liste med (filnavn, bytes) tupler."""
     from PIL import Image

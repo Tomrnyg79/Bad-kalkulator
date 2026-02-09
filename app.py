@@ -3,7 +3,7 @@ import datetime
 import re
 
 from priser import FIRMA, MVA_SATS, FLIS, TOMRER, EPOXY_VALG
-from eksport import generer_pdf, generer_excel, send_epost, generer_tekst_dokument_pdf, generer_bilde_dokument_pdf
+from eksport import generer_pdf, generer_excel, send_epost, generer_tekst_dokument_pdf, generer_bilde_dokument_pdf, generer_kontaktliste_pdf
 from prosjekter import (lagre_prosjekt, oppdater_prosjekt, hent_alle_prosjekter, last_prosjekt,
                          sheets_er_konfigurert, slett_prosjekt,
                          hent_kontakter, lagre_kontakter,
@@ -399,6 +399,19 @@ if st.session_state.get("vis_dokumenter"):
         ],
     }
 
+    def _oppdater_kontaktliste_pdf(pid, adresse, kontaktliste):
+        """Slett gammel kontaktliste-PDF og lag ny."""
+        try:
+            dok = hent_dokumenter(pid)
+            for d in dok:
+                if d["name"] == "Kontaktliste.pdf":
+                    slett_dokument(d["id"])
+            if kontaktliste:
+                pdf_bytes = generer_kontaktliste_pdf(adresse, kontaktliste)
+                lagre_dokument(pid, "Kontaktliste", pdf_bytes)
+        except Exception:
+            pass
+
     try:
         kontakter = hent_kontakter(prosjekt_id)
     except Exception:
@@ -427,6 +440,7 @@ if st.session_state.get("vis_dokumenter"):
                     if st.button("Lagre", key=f"ksave_{ki}", use_container_width=True, type="primary"):
                         kontakter[ki] = {"rolle": ny_rolle, "navn": ny_navn, "tlf": ny_tlf, "epost": ny_epost}
                         lagre_kontakter(prosjekt_id, kontakter)
+                        _oppdater_kontaktliste_pdf(prosjekt_id, dok_adresse, kontakter)
                         del st.session_state[f"redigerer_kontakt_{ki}"]
                         st.rerun()
                 with bk2:
@@ -444,6 +458,7 @@ if st.session_state.get("vis_dokumenter"):
                     if st.button("Slett", key=f"kdel_{ki}", use_container_width=True):
                         kontakter.pop(ki)
                         lagre_kontakter(prosjekt_id, kontakter)
+                        _oppdater_kontaktliste_pdf(prosjekt_id, dok_adresse, kontakter)
                         st.rerun()
         st.divider()
 
@@ -479,6 +494,7 @@ if st.session_state.get("vis_dokumenter"):
                     "epost": ny_epost.strip(),
                 })
                 lagre_kontakter(prosjekt_id, kontakter)
+                _oppdater_kontaktliste_pdf(prosjekt_id, dok_adresse, kontakter)
                 st.success(f"{ny_rolle} «{ny_navn}» lagt til!")
                 st.rerun()
 
