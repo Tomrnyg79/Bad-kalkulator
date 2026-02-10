@@ -494,7 +494,7 @@ if st.session_state.get("side", "hjem") == "hjem":
                 kontraktspris = _hent_kontraktspris(proj)
                 pris_tekst = f" – Avtalt: {fmt(kontraktspris)} kr" if kontraktspris else ""
                 st.markdown(f"**{adr}**  \n{dato} – {bruker}{pris_tekst}")
-                btn_a, btn_d, btn_k, btn_t, btn_s = st.columns(5)
+                btn_a, btn_d, btn_k, btn_s = st.columns(4)
                 with btn_a:
                     if st.button("Åpne kalkyle", key=f"o_open_{idx}", use_container_width=True):
                         last_prosjekt(proj)
@@ -512,13 +512,6 @@ if st.session_state.get("side", "hjem") == "hjem":
                         st.session_state["dok_prosjekt_adresse"] = adr
                         st.session_state["side"] = "kontakter"
                         st.rerun()
-                with btn_t:
-                    if st.button("Tilbake til kalkyle", key=f"o_tilbake_{idx}", use_container_width=True):
-                        try:
-                            oppdater_prosjekt_status(proj.get("id", ""), "kalkyle")
-                            st.rerun()
-                        except Exception as e:
-                            st.error(f"Feil: {e}")
                 with btn_s:
                     bekreft_key = f"bekreft_slett_o_{idx}"
                     if st.session_state.get(bekreft_key):
