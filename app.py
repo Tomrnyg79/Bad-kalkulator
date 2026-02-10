@@ -494,7 +494,7 @@ if st.session_state.get("side", "hjem") == "hjem":
                 kontraktspris = _hent_kontraktspris(proj)
                 pris_tekst = f" – Avtalt: {fmt(kontraktspris)} kr" if kontraktspris else ""
                 st.markdown(f"**{adr}**  \n{dato} – {bruker}{pris_tekst}")
-                btn_a, btn_d, btn_t, btn_s = st.columns(4)
+                btn_a, btn_d, btn_k, btn_t, btn_s = st.columns(5)
                 with btn_a:
                     if st.button("Åpne kalkyle", key=f"o_open_{idx}", use_container_width=True):
                         last_prosjekt(proj)
@@ -505,6 +505,12 @@ if st.session_state.get("side", "hjem") == "hjem":
                         st.session_state["prosjekt_id"] = proj.get("id", "")
                         st.session_state["dok_prosjekt_adresse"] = adr
                         st.session_state["side"] = "dokumenter"
+                        st.rerun()
+                with btn_k:
+                    if st.button("Kontakter", key=f"o_kont_{idx}", use_container_width=True):
+                        st.session_state["prosjekt_id"] = proj.get("id", "")
+                        st.session_state["dok_prosjekt_adresse"] = adr
+                        st.session_state["side"] = "kontakter"
                         st.rerun()
                 with btn_t:
                     if st.button("Tilbake til kalkyle", key=f"o_tilbake_{idx}", use_container_width=True):
@@ -547,13 +553,13 @@ st.markdown(
 )
 
 # ===================================================================
-# DOKUMENTVISNING (side == "dokumenter")
+# KONTAKTER (side == "kontakter")
 # ===================================================================
-if st.session_state.get("side") == "dokumenter":
+if st.session_state.get("side") == "kontakter":
     prosjekt_id = st.session_state.get("prosjekt_id", "")
     dok_adresse = st.session_state.get("dok_prosjekt_adresse", "Ukjent prosjekt")
 
-    st.markdown(f"### Dokumenter – {dok_adresse}")
+    st.markdown(f"### Kontakter – {dok_adresse}")
 
     if st.button("← Tilbake", use_container_width=False):
         st.session_state["side"] = "hjem"
@@ -565,7 +571,6 @@ if st.session_state.get("side") == "dokumenter":
         st.warning("Ingen prosjekt-ID funnet.")
         st.stop()
 
-    # --- Kontakter ---
     _ROLLER = ["Kunde", "Rørlegger", "Elektriker", "Membranlegger", "Uavhengig kontroll", "Nabo", "Annet"]
 
     _HURTIGVALG = {
@@ -597,7 +602,6 @@ if st.session_state.get("side") == "dokumenter":
         kontakter = []
 
     if kontakter:
-        st.markdown("#### Kontakter")
         for ki, kont in enumerate(kontakter):
             rolle = kont.get("rolle", "")
             navn = kont.get("navn", "")
@@ -606,7 +610,6 @@ if st.session_state.get("side") == "dokumenter":
             detaljer = " | ".join(d for d in [tlf, epost] if d)
 
             if st.session_state.get(f"redigerer_kontakt_{ki}"):
-                # Redigeringsmodus
                 rk1, rk2 = st.columns(2)
                 with rk1:
                     ny_rolle = st.selectbox("Rolle", _ROLLER, index=_ROLLER.index(rolle) if rolle in _ROLLER else len(_ROLLER) - 1, key=f"kr_rolle_{ki}")
@@ -640,11 +643,12 @@ if st.session_state.get("side") == "dokumenter":
                         _oppdater_kontaktliste_pdf(prosjekt_id, dok_adresse, kontakter)
                         st.rerun()
         st.divider()
+    else:
+        st.caption("Ingen kontakter ennå.")
 
     with st.expander("+ Legg til kontakt"):
         ny_rolle = st.selectbox("Rolle", _ROLLER, key="ny_kontakt_rolle")
 
-        # Hurtigvalg – autofyll navn/tlf ved valg
         if ny_rolle in _HURTIGVALG:
             personer = _HURTIGVALG[ny_rolle]
             valg_liste = ["Skriv inn manuelt"] + [p["navn"] for p in personer]
@@ -677,9 +681,28 @@ if st.session_state.get("side") == "dokumenter":
                 st.success(f"{ny_rolle} «{ny_navn}» lagt til!")
                 st.rerun()
 
+    st.stop()
+
+# ===================================================================
+# DOKUMENTVISNING (side == "dokumenter")
+# ===================================================================
+if st.session_state.get("side") == "dokumenter":
+    prosjekt_id = st.session_state.get("prosjekt_id", "")
+    dok_adresse = st.session_state.get("dok_prosjekt_adresse", "Ukjent prosjekt")
+
+    st.markdown(f"### Dokumenter – {dok_adresse}")
+
+    if st.button("← Tilbake", use_container_width=False):
+        st.session_state["side"] = "hjem"
+        st.rerun()
+
     st.divider()
 
-    # --- Dokumentliste (øverst) ---
+    if not prosjekt_id:
+        st.warning("Ingen prosjekt-ID funnet.")
+        st.stop()
+
+    # --- Dokumentliste ---
     try:
         dok_liste = hent_dokumenter(prosjekt_id)
         if not dok_liste:
