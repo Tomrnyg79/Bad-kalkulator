@@ -41,9 +41,31 @@ if not st.session_state.autentisert:
             st.error("Feil brukernavn eller passord.")
     st.stop()
 
+# ---------------------------------------------------------------------------
+# Delte brukergrupper – brukere i samme gruppe ser hverandres prosjekter
+# ---------------------------------------------------------------------------
+DELTE_BRUKERE = [{"tom", "roy"}]
+
+
+def _synlig_for(innlogget, prosjekt_bruker):
+    """Sjekk om innlogget bruker skal se prosjektet til prosjekt_bruker."""
+    a = innlogget.lower()
+    b = prosjekt_bruker.lower()
+    if a == b:
+        return True
+    # E-post-prosjekter er synlige for alle i en delt gruppe
+    if b == "e-post":
+        for gruppe in DELTE_BRUKERE:
+            if a in gruppe:
+                return True
+    for gruppe in DELTE_BRUKERE:
+        if a in gruppe and b in gruppe:
+            return True
+    return False
+
 
 # ---------------------------------------------------------------------------
-# Sidebar – bruker, prosjekter, logg ut
+# Sidebar – bruker, hjem, lagre, logg ut
 # ---------------------------------------------------------------------------
 with st.sidebar:
     st.markdown(f"Innlogget som **{st.session_state.bruker}**")
@@ -54,8 +76,13 @@ with st.sidebar:
 
     st.divider()
 
-    # Lagre/oppdater prosjekt (kun synlig på steg 5)
-    if st.session_state.get("steg") == 5 and sheets_er_konfigurert():
+    if st.button("Hjem", use_container_width=True):
+        st.session_state["side"] = "hjem"
+        st.rerun()
+
+    # Lagre/oppdater prosjekt (kun synlig på steg 5 i kalkyle)
+    if st.session_state.get("side") == "kalkyle" and st.session_state.get("steg") == 5 and sheets_er_konfigurert():
+        st.divider()
         har_prosjekt = bool(st.session_state.get("prosjekt_id"))
         if har_prosjekt:
             if st.button("Lagre kalkyle", use_container_width=True, type="primary"):
@@ -85,84 +112,6 @@ with st.sidebar:
                 st.rerun()
             except Exception as e:
                 st.error(f"Kunne ikke lagre: {e}")
-
-    # Sjekk e-post for nye prosjekter
-    if imap_er_konfigurert():
-        if st.button("Sjekk e-post", use_container_width=True):
-            try:
-                nye = sjekk_epost()
-                if nye:
-                    st.success(f"Opprettet {len(nye)} prosjekt(er): {', '.join(nye)}")
-                    st.rerun()
-                else:
-                    st.info("Ingen nye e-poster.")
-            except Exception as e:
-                st.error(f"Kunne ikke sjekke e-post: {e}")
-
-    st.divider()
-
-    # Delte brukergrupper – brukere i samme gruppe ser hverandres prosjekter
-    DELTE_BRUKERE = [{"tom", "roy"}]
-
-    def _synlig_for(innlogget, prosjekt_bruker):
-        """Sjekk om innlogget bruker skal se prosjektet til prosjekt_bruker."""
-        a = innlogget.lower()
-        b = prosjekt_bruker.lower()
-        if a == b:
-            return True
-        # E-post-prosjekter er synlige for alle i en delt gruppe
-        if b == "e-post":
-            for gruppe in DELTE_BRUKERE:
-                if a in gruppe:
-                    return True
-        for gruppe in DELTE_BRUKERE:
-            if a in gruppe and b in gruppe:
-                return True
-        return False
-
-    # Liste over lagrede prosjekter
-    if sheets_er_konfigurert():
-        st.markdown("#### Lagrede prosjekter")
-        try:
-            prosjekter = hent_alle_prosjekter()
-            innlogget_bruker = st.session_state.get("bruker", "")
-            prosjekter = [p for p in prosjekter if _synlig_for(innlogget_bruker, p.get("bruker", ""))]
-            if not prosjekter:
-                st.caption("Ingen lagrede prosjekter ennå.")
-            for idx, proj in enumerate(prosjekter):
-                adr = proj.get("adresse", "Ukjent")
-                dato = proj.get("dato", "")
-                bruker = proj.get("bruker", "")
-                st.markdown(f"**{adr}**  \n{dato} – {bruker}")
-                btn_a, btn_d, btn_s = st.columns(3)
-                with btn_a:
-                    if st.button("Åpne", key=f"open_{idx}", use_container_width=True):
-                        last_prosjekt(proj)
-                        st.rerun()
-                with btn_d:
-                    if st.button("Dok.", key=f"docs_{idx}", use_container_width=True):
-                        st.session_state["prosjekt_id"] = proj.get("id", "")
-                        st.session_state["dok_prosjekt_adresse"] = adr
-                        st.session_state["vis_dokumenter"] = True
-                        st.rerun()
-                with btn_s:
-                    bekreft_key = f"bekreft_slett_{idx}"
-                    if st.session_state.get(bekreft_key):
-                        if st.button("Bekreft?", key=f"slett2_{idx}", use_container_width=True, type="primary"):
-                            try:
-                                slett_prosjekt(proj.get("id", ""))
-                                del st.session_state[bekreft_key]
-                                st.rerun()
-                            except Exception as e:
-                                st.error(f"Feil: {e}")
-                    else:
-                        if st.button("Slett", key=f"slett_{idx}", use_container_width=True):
-                            st.session_state[bekreft_key] = True
-                            st.rerun()
-        except Exception as e:
-            st.caption(f"Kunne ikke hente prosjekter: {e}")
-    else:
-        st.caption("Google Sheets er ikke konfigurert. Prosjektlagring er deaktivert.")
 
 
 def fmt(tall):
@@ -346,6 +295,9 @@ def etasjetillegg_prosent(d):
 # ---------------------------------------------------------------------------
 # Session state
 # ---------------------------------------------------------------------------
+if "side" not in st.session_state:
+    st.session_state.side = "hjem"
+
 if "steg" not in st.session_state:
     st.session_state.steg = 1
 
@@ -366,6 +318,98 @@ STEG = ["Prosjekt", "Rommål", "Romdetaljer", "Tjeneste", "Oppsummering"]
 # ---------------------------------------------------------------------------
 import pathlib
 _logo = pathlib.Path(__file__).parent / "unnamed.jpg"
+
+# ===================================================================
+# STARTSIDE – Prosjektoversikt (side == "hjem")
+# ===================================================================
+if st.session_state.get("side", "hjem") == "hjem":
+    if _logo.exists():
+        col1, col2, col3 = st.columns([1, 1, 1])
+        with col2:
+            st.image(str(_logo), use_container_width=True)
+    st.markdown(
+        "<h2 style='text-align:center; color:#555; margin-top:0'>Nygård Bad – Prosjekter</h2>",
+        unsafe_allow_html=True,
+    )
+
+    # Knapperad
+    _hjem_k1, _hjem_k2 = st.columns(2)
+    with _hjem_k1:
+        if st.button("Ny kalkyle", use_container_width=True, type="primary"):
+            # Nullstill kalkyle-state
+            autentisert = st.session_state.get("autentisert")
+            bruker = st.session_state.get("bruker")
+            for nk in list(st.session_state.keys()):
+                del st.session_state[nk]
+            st.session_state.autentisert = autentisert
+            st.session_state.bruker = bruker
+            st.session_state["side"] = "kalkyle"
+            st.session_state["steg"] = 1
+            st.rerun()
+    with _hjem_k2:
+        if imap_er_konfigurert():
+            if st.button("Sjekk e-post", use_container_width=True):
+                try:
+                    nye = sjekk_epost()
+                    if nye:
+                        st.success(f"Opprettet {len(nye)} prosjekt(er): {', '.join(nye)}")
+                        st.rerun()
+                    else:
+                        st.info("Ingen nye e-poster.")
+                except Exception as e:
+                    st.error(f"Kunne ikke sjekke e-post: {e}")
+
+    st.divider()
+
+    # Prosjektliste
+    if sheets_er_konfigurert():
+        try:
+            prosjekter = hent_alle_prosjekter()
+            innlogget_bruker = st.session_state.get("bruker", "")
+            prosjekter = [p for p in prosjekter if _synlig_for(innlogget_bruker, p.get("bruker", ""))]
+            if not prosjekter:
+                st.caption("Ingen lagrede prosjekter ennå.")
+            for idx, proj in enumerate(prosjekter):
+                adr = proj.get("adresse", "Ukjent")
+                dato = proj.get("dato", "")
+                bruker = proj.get("bruker", "")
+                st.markdown(f"**{adr}**  \n{dato} – {bruker}")
+                btn_a, btn_d, btn_s = st.columns(3)
+                with btn_a:
+                    if st.button("Åpne kalkyle", key=f"open_{idx}", use_container_width=True):
+                        last_prosjekt(proj)
+                        st.session_state["side"] = "kalkyle"
+                        st.rerun()
+                with btn_d:
+                    if st.button("Dokumenter", key=f"docs_{idx}", use_container_width=True):
+                        st.session_state["prosjekt_id"] = proj.get("id", "")
+                        st.session_state["dok_prosjekt_adresse"] = adr
+                        st.session_state["side"] = "dokumenter"
+                        st.rerun()
+                with btn_s:
+                    bekreft_key = f"bekreft_slett_{idx}"
+                    if st.session_state.get(bekreft_key):
+                        if st.button("Bekreft?", key=f"slett2_{idx}", use_container_width=True, type="primary"):
+                            try:
+                                slett_prosjekt(proj.get("id", ""))
+                                del st.session_state[bekreft_key]
+                                st.rerun()
+                            except Exception as e:
+                                st.error(f"Feil: {e}")
+                    else:
+                        if st.button("Slett", key=f"slett_{idx}", use_container_width=True):
+                            st.session_state[bekreft_key] = True
+                            st.rerun()
+        except Exception as e:
+            st.caption(f"Kunne ikke hente prosjekter: {e}")
+    else:
+        st.caption("Google Sheets er ikke konfigurert. Prosjektlagring er deaktivert.")
+
+    st.stop()
+
+# ---------------------------------------------------------------------------
+# Felles header for kalkyle og dokumenter
+# ---------------------------------------------------------------------------
 if _logo.exists():
     col1, col2, col3 = st.columns([1, 1, 1])
     with col2:
@@ -376,16 +420,16 @@ st.markdown(
 )
 
 # ===================================================================
-# DOKUMENTVISNING (separat fra kalkyle-stegene)
+# DOKUMENTVISNING (side == "dokumenter")
 # ===================================================================
-if st.session_state.get("vis_dokumenter"):
+if st.session_state.get("side") == "dokumenter":
     prosjekt_id = st.session_state.get("prosjekt_id", "")
     dok_adresse = st.session_state.get("dok_prosjekt_adresse", "Ukjent prosjekt")
 
     st.markdown(f"### Dokumenter – {dok_adresse}")
 
-    if st.button("← Tilbake til kalkyle", use_container_width=False):
-        st.session_state["vis_dokumenter"] = False
+    if st.button("← Tilbake", use_container_width=False):
+        st.session_state["side"] = "hjem"
         st.rerun()
 
     st.divider()
@@ -631,8 +675,11 @@ if st.session_state.get("vis_dokumenter"):
     st.stop()
 
 # ===================================================================
-# KALKYLE-STEG (vises kun når vis_dokumenter er False/ikke satt)
+# KALKYLE-STEG (vises kun når side == "kalkyle")
 # ===================================================================
+if st.session_state.get("side") != "kalkyle":
+    st.stop()
+
 fremdrift = (st.session_state.steg - 1) / (len(STEG) - 1)
 st.progress(fremdrift)
 st.markdown(f"**Steg {st.session_state.steg} av {len(STEG)}: {STEG[st.session_state.steg - 1]}**")
@@ -1254,10 +1301,5 @@ elif st.session_state.steg == 5:
             st.rerun()
     with kol_h:
         if st.button("Ny kalkyle", use_container_width=True, type="primary"):
-            autentisert = st.session_state.get("autentisert")
-            bruker = st.session_state.get("bruker")
-            for nk in list(st.session_state.keys()):
-                del st.session_state[nk]
-            st.session_state.autentisert = autentisert
-            st.session_state.bruker = bruker
+            st.session_state["side"] = "hjem"
             st.rerun()
