@@ -406,6 +406,10 @@ if st.session_state.get("side", "hjem") == "hjem":
                 with btn_a:
                     if st.button("Åpne kalkyle", key=f"k_open_{idx}", use_container_width=True):
                         last_prosjekt(proj)
+                        if st.session_state.get("_kalkyle_type") == "manuell":
+                            st.session_state["side"] = "manuell_kalkyle"
+                        else:
+                            st.session_state["side"] = "kalkyle"
                         st.rerun()
                 with btn_d:
                     if st.button("Dokumenter", key=f"k_docs_{idx}", use_container_width=True):
@@ -489,6 +493,10 @@ if st.session_state.get("side", "hjem") == "hjem":
                 with btn_a:
                     if st.button("Åpne kalkyle", key=f"o_open_{idx}", use_container_width=True):
                         last_prosjekt(proj)
+                        if st.session_state.get("_kalkyle_type") == "manuell":
+                            st.session_state["side"] = "manuell_kalkyle"
+                        else:
+                            st.session_state["side"] = "kalkyle"
                         st.rerun()
                 with btn_d:
                     if st.button("Dokumenter", key=f"o_docs_{idx}", use_container_width=True):
