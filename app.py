@@ -227,7 +227,7 @@ def beregn_flisarbeider(d):
         cist_beh = d.get("cisternekasse_beh", "List")
         if "Gjæring" in cist_beh:
             poster.append(p("Cisternekasse m/gjæring", cist, "stk", FLIS["cisternekasse_gjaring"]))
-        elif "Gips" not in cist_beh:
+        elif "Gips" not in cist_beh and "Bygd inn" not in cist_beh:
             poster.append(p("Cisternekasse m/list", cist, "stk", FLIS["cisternekasse_list"]))
 
     # Silikonering: innvendige hjørner (høyde per stk) + overgang gulv/vegg (løpemeter)
@@ -300,9 +300,6 @@ def beregn_tomrerarbeid(d):
     cist = d.get("antall_cisternekasser", 0)
     if cist > 0:
         poster.append(p("Cisternekasse tømrer", cist, "stk", TOMRER["cisternekasse"]))
-        cist_beh = d.get("cisternekasse_beh", "List")
-        if "Gips" in cist_beh:
-            poster.append(p("Cisternekasse gips/trevirke", cist, "stk", FLIS["cisternekasse_gips_trevirke"]))
 
     innv = d.get("innvendige_hjorner", 4)
     if innv > 4:
@@ -1307,7 +1304,7 @@ elif st.session_state.steg == 3:
     if st.session_state.get("antall_cisternekasser", 0) > 0:
         st.radio(
             "Cisternekasse behandling",
-            ["List (3 500 kr/stk)", "Gjæring (4 500 kr/stk)", "Gips/trevirke (1 950 kr/stk)"],
+            ["List (3 500 kr/stk)", "Gjæring (4 500 kr/stk)", "Gips/trevirke (1 950 kr/stk)", "Bygd inn i vegg (1 950 kr/stk)"],
             horizontal=True, key="cisternekasse_beh",
         )
 
