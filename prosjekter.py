@@ -230,6 +230,30 @@ def lagre_kontakter(prosjekt_id, kontakter):
     raise ValueError(f"Prosjekt {prosjekt_id} ikke funnet")
 
 
+def oppdater_prosjekt_status(prosjekt_id, status, kontraktspris=None):
+    """Oppdater _status (og eventuelt _kontraktspris) i prosjektets json_data."""
+    ws = _get_worksheet()
+    alle = ws.get_all_values()
+    for idx, rad in enumerate(alle):
+        if idx == 0:
+            continue
+        if rad[0] == str(prosjekt_id):
+            try:
+                data = json.loads(rad[4]) if rad[4] else {}
+            except (json.JSONDecodeError, IndexError):
+                data = {}
+            data["_status"] = status
+            if kontraktspris is not None:
+                data["_kontraktspris"] = kontraktspris
+            elif status == "kalkyle":
+                # Fjern kontraktspris når man flytter tilbake til kalkyle
+                data.pop("_kontraktspris", None)
+            ws.update_cell(idx + 1, 5, json.dumps(data, ensure_ascii=False))
+            _tøm_prosjekt_cache()
+            return
+    raise ValueError(f"Prosjekt {prosjekt_id} ikke funnet")
+
+
 # ---------------------------------------------------------------------------
 # Google Sheets – dokumenthåndtering (base64 i celler)
 # ---------------------------------------------------------------------------

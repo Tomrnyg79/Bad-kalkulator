@@ -1,3 +1,4 @@
+import json
 import streamlit as st
 import datetime
 import re
@@ -9,7 +10,8 @@ from prosjekter import (lagre_prosjekt, oppdater_prosjekt, hent_alle_prosjekter,
                          hent_kontakter, lagre_kontakter,
                          lagre_dokument, hent_dokumenter,
                          last_ned_dokument, slett_dokument, endre_dokumentnavn,
-                         imap_er_konfigurert, sjekk_epost)
+                         imap_er_konfigurert, sjekk_epost,
+                         oppdater_prosjekt_status)
 
 st.set_page_config(page_title="Baderoms kalkyle | Nygård Bad", page_icon="🛁", layout="centered")
 
@@ -62,6 +64,34 @@ def _synlig_for(innlogget, prosjekt_bruker):
         if a in gruppe and b in gruppe:
             return True
     return False
+
+
+def _hent_status(proj):
+    """Hent prosjektstatus fra json_data. Default 'kalkyle'."""
+    try:
+        data = json.loads(proj.get("json_data", "{}"))
+        return data.get("_status", "kalkyle")
+    except Exception:
+        return "kalkyle"
+
+
+def _hent_total_fra_prosjekt(proj):
+    """Hent total inkl. mva fra prosjektets json_data."""
+    try:
+        data = json.loads(proj.get("json_data", "{}"))
+        eksport = data.get("_eksport_data", {})
+        return eksport.get("total_inkl", 0)
+    except Exception:
+        return 0
+
+
+def _hent_kontraktspris(proj):
+    """Hent kontraktspris fra prosjektets json_data."""
+    try:
+        data = json.loads(proj.get("json_data", "{}"))
+        return data.get("_kontraktspris", 0)
+    except Exception:
+        return 0
 
 
 # ---------------------------------------------------------------------------
@@ -367,29 +397,40 @@ if st.session_state.get("side", "hjem") == "hjem":
             prosjekter = hent_alle_prosjekter()
             innlogget_bruker = st.session_state.get("bruker", "")
             prosjekter = [p for p in prosjekter if _synlig_for(innlogget_bruker, p.get("bruker", ""))]
-            if not prosjekter:
-                st.caption("Ingen lagrede prosjekter ennå.")
-            for idx, proj in enumerate(prosjekter):
+
+            kalkyler = [p for p in prosjekter if _hent_status(p) == "kalkyle"]
+            oppdrag = [p for p in prosjekter if _hent_status(p) == "oppdrag"]
+
+            # --- Seksjon 1: Kalkyler ---
+            st.markdown("### Kalkyler")
+            if not kalkyler:
+                st.caption("Ingen kalkyler.")
+            for idx, proj in enumerate(kalkyler):
                 adr = proj.get("adresse", "Ukjent")
                 dato = proj.get("dato", "")
                 bruker = proj.get("bruker", "")
                 st.markdown(f"**{adr}**  \n{dato} – {bruker}")
-                btn_a, btn_d, btn_s = st.columns(3)
+                btn_a, btn_d, btn_o, btn_s = st.columns(4)
                 with btn_a:
-                    if st.button("Åpne kalkyle", key=f"open_{idx}", use_container_width=True):
+                    if st.button("Åpne kalkyle", key=f"k_open_{idx}", use_container_width=True):
                         last_prosjekt(proj)
                         st.session_state["side"] = "kalkyle"
                         st.rerun()
                 with btn_d:
-                    if st.button("Dokumenter", key=f"docs_{idx}", use_container_width=True):
+                    if st.button("Dokumenter", key=f"k_docs_{idx}", use_container_width=True):
                         st.session_state["prosjekt_id"] = proj.get("id", "")
                         st.session_state["dok_prosjekt_adresse"] = adr
                         st.session_state["side"] = "dokumenter"
                         st.rerun()
+                with btn_o:
+                    oppdrag_key = f"vis_oppdrag_skjema_{idx}"
+                    if st.button("Mottatt oppdrag", key=f"k_oppdrag_{idx}", use_container_width=True):
+                        st.session_state[oppdrag_key] = True
+                        st.rerun()
                 with btn_s:
-                    bekreft_key = f"bekreft_slett_{idx}"
+                    bekreft_key = f"bekreft_slett_k_{idx}"
                     if st.session_state.get(bekreft_key):
-                        if st.button("Bekreft?", key=f"slett2_{idx}", use_container_width=True, type="primary"):
+                        if st.button("Bekreft?", key=f"k_slett2_{idx}", use_container_width=True, type="primary"):
                             try:
                                 slett_prosjekt(proj.get("id", ""))
                                 del st.session_state[bekreft_key]
@@ -397,7 +438,93 @@ if st.session_state.get("side", "hjem") == "hjem":
                             except Exception as e:
                                 st.error(f"Feil: {e}")
                     else:
-                        if st.button("Slett", key=f"slett_{idx}", use_container_width=True):
+                        if st.button("Slett", key=f"k_slett_{idx}", use_container_width=True):
+                            st.session_state[bekreft_key] = True
+                            st.rerun()
+
+                # Inline-skjema for "Mottatt oppdrag"
+                oppdrag_key = f"vis_oppdrag_skjema_{idx}"
+                if st.session_state.get(oppdrag_key):
+                    total_kalkyle = _hent_total_fra_prosjekt(proj)
+                    pris_som_kalkyle = st.checkbox(
+                        "Pris som i kalkyle",
+                        key=f"k_pris_som_kalkyle_{idx}",
+                        value=False,
+                    )
+                    if pris_som_kalkyle and total_kalkyle > 0:
+                        avtalt_pris = st.number_input(
+                            "Avtalt pris (inkl. mva)",
+                            min_value=0,
+                            value=int(total_kalkyle),
+                            step=1000,
+                            key=f"k_avtalt_pris_{idx}",
+                        )
+                    else:
+                        avtalt_pris = st.number_input(
+                            "Avtalt pris (inkl. mva)",
+                            min_value=0,
+                            value=0,
+                            step=1000,
+                            key=f"k_avtalt_pris_{idx}",
+                        )
+                    ok_col, avbryt_col = st.columns(2)
+                    with ok_col:
+                        if st.button("Bekreft", key=f"k_bekreft_oppdrag_{idx}", use_container_width=True, type="primary"):
+                            try:
+                                oppdater_prosjekt_status(proj.get("id", ""), "oppdrag", avtalt_pris)
+                                del st.session_state[oppdrag_key]
+                                st.rerun()
+                            except Exception as e:
+                                st.error(f"Feil: {e}")
+                    with avbryt_col:
+                        if st.button("Avbryt", key=f"k_avbryt_oppdrag_{idx}", use_container_width=True):
+                            del st.session_state[oppdrag_key]
+                            st.rerun()
+
+            st.divider()
+
+            # --- Seksjon 2: Oppdrag mottatt ---
+            st.markdown("### Oppdrag mottatt")
+            if not oppdrag:
+                st.caption("Ingen oppdrag mottatt.")
+            for idx, proj in enumerate(oppdrag):
+                adr = proj.get("adresse", "Ukjent")
+                dato = proj.get("dato", "")
+                bruker = proj.get("bruker", "")
+                kontraktspris = _hent_kontraktspris(proj)
+                pris_tekst = f" – Avtalt: {fmt(kontraktspris)} kr" if kontraktspris else ""
+                st.markdown(f"**{adr}**  \n{dato} – {bruker}{pris_tekst}")
+                btn_a, btn_d, btn_t, btn_s = st.columns(4)
+                with btn_a:
+                    if st.button("Åpne kalkyle", key=f"o_open_{idx}", use_container_width=True):
+                        last_prosjekt(proj)
+                        st.session_state["side"] = "kalkyle"
+                        st.rerun()
+                with btn_d:
+                    if st.button("Dokumenter", key=f"o_docs_{idx}", use_container_width=True):
+                        st.session_state["prosjekt_id"] = proj.get("id", "")
+                        st.session_state["dok_prosjekt_adresse"] = adr
+                        st.session_state["side"] = "dokumenter"
+                        st.rerun()
+                with btn_t:
+                    if st.button("Tilbake til kalkyle", key=f"o_tilbake_{idx}", use_container_width=True):
+                        try:
+                            oppdater_prosjekt_status(proj.get("id", ""), "kalkyle")
+                            st.rerun()
+                        except Exception as e:
+                            st.error(f"Feil: {e}")
+                with btn_s:
+                    bekreft_key = f"bekreft_slett_o_{idx}"
+                    if st.session_state.get(bekreft_key):
+                        if st.button("Bekreft?", key=f"o_slett2_{idx}", use_container_width=True, type="primary"):
+                            try:
+                                slett_prosjekt(proj.get("id", ""))
+                                del st.session_state[bekreft_key]
+                                st.rerun()
+                            except Exception as e:
+                                st.error(f"Feil: {e}")
+                    else:
+                        if st.button("Slett", key=f"o_slett_{idx}", use_container_width=True):
                             st.session_state[bekreft_key] = True
                             st.rerun()
         except Exception as e:
