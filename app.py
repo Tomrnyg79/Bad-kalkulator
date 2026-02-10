@@ -366,15 +366,7 @@ if st.session_state.get("side", "hjem") == "hjem":
     _hjem_k1, _hjem_k2 = st.columns(2)
     with _hjem_k1:
         if st.button("Ny kalkyle", use_container_width=True, type="primary"):
-            # Nullstill kalkyle-state
-            autentisert = st.session_state.get("autentisert")
-            bruker = st.session_state.get("bruker")
-            for nk in list(st.session_state.keys()):
-                del st.session_state[nk]
-            st.session_state.autentisert = autentisert
-            st.session_state.bruker = bruker
-            st.session_state["side"] = "kalkyle"
-            st.session_state["steg"] = 1
+            st.session_state["side"] = "velg_kalkyle_type"
             st.rerun()
     with _hjem_k2:
         if imap_er_konfigurert():
@@ -414,7 +406,6 @@ if st.session_state.get("side", "hjem") == "hjem":
                 with btn_a:
                     if st.button("Åpne kalkyle", key=f"k_open_{idx}", use_container_width=True):
                         last_prosjekt(proj)
-                        st.session_state["side"] = "kalkyle"
                         st.rerun()
                 with btn_d:
                     if st.button("Dokumenter", key=f"k_docs_{idx}", use_container_width=True):
@@ -498,7 +489,6 @@ if st.session_state.get("side", "hjem") == "hjem":
                 with btn_a:
                     if st.button("Åpne kalkyle", key=f"o_open_{idx}", use_container_width=True):
                         last_prosjekt(proj)
-                        st.session_state["side"] = "kalkyle"
                         st.rerun()
                 with btn_d:
                     if st.button("Dokumenter", key=f"o_docs_{idx}", use_container_width=True):
@@ -530,6 +520,231 @@ if st.session_state.get("side", "hjem") == "hjem":
             st.caption(f"Kunne ikke hente prosjekter: {e}")
     else:
         st.caption("Google Sheets er ikke konfigurert. Prosjektlagring er deaktivert.")
+
+    st.stop()
+
+# ===================================================================
+# VELG KALKYLETYPE (side == "velg_kalkyle_type")
+# ===================================================================
+if st.session_state.get("side") == "velg_kalkyle_type":
+    if _logo.exists():
+        col1, col2, col3 = st.columns([1, 1, 1])
+        with col2:
+            st.image(str(_logo), use_container_width=True)
+    st.markdown(
+        "<h2 style='text-align:center; color:#555; margin-top:0'>Velg kalkyletype</h2>",
+        unsafe_allow_html=True,
+    )
+
+    st.divider()
+
+    _vk1, _vk2 = st.columns(2)
+    with _vk1:
+        st.markdown("#### Bad / WC / Vaskerom")
+        st.caption("Automatisk kalkyle med rommål, flisarbeider og tømrerarbeider.")
+        if st.button("Bad / WC / Vaskerom", use_container_width=True, type="primary"):
+            autentisert = st.session_state.get("autentisert")
+            bruker = st.session_state.get("bruker")
+            for nk in list(st.session_state.keys()):
+                del st.session_state[nk]
+            st.session_state.autentisert = autentisert
+            st.session_state.bruker = bruker
+            st.session_state["side"] = "kalkyle"
+            st.session_state["steg"] = 1
+            st.rerun()
+    with _vk2:
+        st.markdown("#### Manuell kalkyle")
+        st.caption("Fritt legg inn poster med beskrivelse, mengde og pris.")
+        if st.button("Manuell kalkyle", use_container_width=True, type="primary"):
+            autentisert = st.session_state.get("autentisert")
+            bruker = st.session_state.get("bruker")
+            for nk in list(st.session_state.keys()):
+                del st.session_state[nk]
+            st.session_state.autentisert = autentisert
+            st.session_state.bruker = bruker
+            st.session_state["side"] = "manuell_kalkyle"
+            st.rerun()
+
+    st.divider()
+    if st.button("← Tilbake", use_container_width=False):
+        st.session_state["side"] = "hjem"
+        st.rerun()
+
+    st.stop()
+
+# ===================================================================
+# MANUELL KALKYLE (side == "manuell_kalkyle")
+# ===================================================================
+if st.session_state.get("side") == "manuell_kalkyle":
+    if _logo.exists():
+        col1, col2, col3 = st.columns([1, 1, 1])
+        with col2:
+            st.image(str(_logo), use_container_width=True)
+    st.markdown(
+        "<h2 style='text-align:center; color:#555; margin-top:0'>Manuell kalkyle</h2>",
+        unsafe_allow_html=True,
+    )
+
+    # Prosjektadresse
+    st.text_input("Prosjektadresse", placeholder="F.eks. Storgata 1, 0570 Oslo", key="m_adresse")
+
+    st.divider()
+    st.subheader("Poster")
+
+    # Dynamisk postliste
+    if "_m_antall_poster" not in st.session_state:
+        st.session_state["_m_antall_poster"] = 1
+
+    antall = st.session_state["_m_antall_poster"]
+
+    _hc1, _hc2, _hc3, _hc4 = st.columns([3, 1, 1, 1.5])
+    with _hc1:
+        st.caption("Beskrivelse")
+    with _hc2:
+        st.caption("Mengde")
+    with _hc3:
+        st.caption("Enhet")
+    with _hc4:
+        st.caption("Enhetspris eks. mva")
+
+    for i in range(antall):
+        if f"m_enhet_{i}" not in st.session_state:
+            st.session_state[f"m_enhet_{i}"] = "stk"
+        _mc1, _mc2, _mc3, _mc4 = st.columns([3, 1, 1, 1.5])
+        with _mc1:
+            st.text_input("Beskrivelse", key=f"m_beskr_{i}", label_visibility="collapsed",
+                          placeholder="Beskrivelse")
+        with _mc2:
+            st.number_input("Mengde", min_value=0.0, step=1.0, format="%.2f",
+                            key=f"m_mengde_{i}", label_visibility="collapsed")
+        with _mc3:
+            st.text_input("Enhet", key=f"m_enhet_{i}", label_visibility="collapsed",
+                          placeholder="stk")
+        with _mc4:
+            st.number_input("Enhetspris eks. mva", min_value=0.0, step=100.0, format="%.0f",
+                            key=f"m_pris_{i}", label_visibility="collapsed")
+
+        mengde_i = st.session_state.get(f"m_mengde_{i}", 0)
+        pris_i = st.session_state.get(f"m_pris_{i}", 0)
+        sum_i = mengde_i * pris_i
+        if sum_i > 0:
+            st.caption(f"Sum: {fmt(round(sum_i))} kr")
+
+    _mb1, _mb2, _ = st.columns([1, 1, 2])
+    with _mb1:
+        if st.button("+ Legg til post", use_container_width=True):
+            st.session_state["_m_antall_poster"] += 1
+            st.rerun()
+    with _mb2:
+        if antall > 1:
+            if st.button("- Fjern siste", use_container_width=True):
+                siste = antall - 1
+                for k in [f"m_beskr_{siste}", f"m_mengde_{siste}", f"m_enhet_{siste}", f"m_pris_{siste}"]:
+                    if k in st.session_state:
+                        del st.session_state[k]
+                st.session_state["_m_antall_poster"] -= 1
+                st.rerun()
+
+    # Bygg postliste og beregn totaler
+    poster_liste = []
+    for i in range(antall):
+        beskr = st.session_state.get(f"m_beskr_{i}", "").strip()
+        mengde = st.session_state.get(f"m_mengde_{i}", 0)
+        enhet = st.session_state.get(f"m_enhet_{i}", "stk").strip() or "stk"
+        pris = st.session_state.get(f"m_pris_{i}", 0)
+        total = round(mengde * pris)
+        if beskr or total > 0:
+            poster_liste.append((beskr or f"Post {i+1}", mengde, enhet, pris, total))
+
+    subtotal = sum(t for _, _, _, _, t in poster_liste)
+    mva = round(subtotal * MVA_SATS)
+    total_inkl = subtotal + mva
+
+    # Totalvisning
+    st.divider()
+    _, _kol_total = st.columns([2, 2])
+    with _kol_total:
+        st.markdown(f"**Sum eks. mva:** {fmt(subtotal)} kr")
+        st.markdown(f"**MVA 25%:** {fmt(mva)} kr")
+        st.markdown(f"### Total inkl. mva: {fmt(total_inkl)} kr")
+
+    # Lagre _-prefiks verdier for prosjektlagring
+    st.session_state["_adresse"] = st.session_state.get("m_adresse", "")
+    st.session_state["_m_adresse"] = st.session_state.get("m_adresse", "")
+    st.session_state["_kalkyle_type"] = "manuell"
+    for i in range(antall):
+        st.session_state[f"_m_beskr_{i}"] = st.session_state.get(f"m_beskr_{i}", "")
+        st.session_state[f"_m_mengde_{i}"] = st.session_state.get(f"m_mengde_{i}", 0)
+        st.session_state[f"_m_enhet_{i}"] = st.session_state.get(f"m_enhet_{i}", "stk")
+        st.session_state[f"_m_pris_{i}"] = st.session_state.get(f"m_pris_{i}", 0)
+
+    # Eksportdata
+    dato = datetime.date.today().strftime("%d.%m.%Y")
+    eksport_data = {
+        "kalkyle_type": "manuell",
+        "adresse": st.session_state.get("m_adresse", ""),
+        "dato": dato,
+        "poster": poster_liste,
+        "flis_poster": poster_liste,
+        "tomrer_poster": [],
+        "tillegg_pst": 0,
+        "etasje_tillegg": 0,
+        "subtotal": subtotal,
+        "mva": mva,
+        "total_inkl": total_inkl,
+    }
+    st.session_state["_eksport_data"] = eksport_data
+
+    # Eksport-knapper
+    st.divider()
+    st.subheader("Eksporter kalkyle")
+    filnavn = f"kalkyle_{trygt_filnavn(st.session_state.get('m_adresse', 'manuell'))}_{datetime.date.today()}"
+
+    _ek1, _ek2 = st.columns(2)
+    with _ek1:
+        st.download_button(
+            "Last ned PDF", generer_pdf(eksport_data),
+            f"{filnavn}.pdf", "application/pdf", use_container_width=True,
+        )
+    with _ek2:
+        st.download_button(
+            "Last ned Excel", generer_excel(eksport_data),
+            f"{filnavn}.xlsx",
+            "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+            use_container_width=True,
+        )
+
+    # Lagre som prosjekt
+    if sheets_er_konfigurert():
+        st.divider()
+        har_prosjekt = bool(st.session_state.get("prosjekt_id"))
+        if har_prosjekt:
+            if st.button("Lagre kalkyle", use_container_width=True, type="primary"):
+                try:
+                    pid = st.session_state["prosjekt_id"]
+                    oppdater_prosjekt(pid, st.session_state.bruker)
+                    pdf_bytes = generer_pdf(eksport_data)
+                    lagre_dokument(pid, "Kalkyle", pdf_bytes)
+                    st.success("Kalkyle lagret!")
+                    st.rerun()
+                except Exception as e:
+                    st.error(f"Kunne ikke lagre: {e}")
+        if st.button("Lagre som nytt prosjekt", use_container_width=True,
+                      type="secondary" if har_prosjekt else "primary"):
+            try:
+                pid = lagre_prosjekt(st.session_state.bruker)
+                st.session_state["prosjekt_id"] = pid
+                pdf_bytes = generer_pdf(eksport_data)
+                lagre_dokument(pid, "Kalkyle", pdf_bytes)
+                st.success(f"Nytt prosjekt lagret! (ID: {pid})")
+                st.rerun()
+            except Exception as e:
+                st.error(f"Kunne ikke lagre: {e}")
+
+    st.divider()
+    if st.button("← Tilbake til hjem", use_container_width=False):
+        st.session_state["side"] = "hjem"
+        st.rerun()
 
     st.stop()
 

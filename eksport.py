@@ -95,17 +95,24 @@ def generer_pdf(data):
     pdf.ln(6)
 
     # Tittel
+    er_manuell = data.get("kalkyle_type") == "manuell"
     pdf.set_font("Helvetica", "B", 18)
-    pdf.cell(0, 10, "BADEROMS KALKYLE", new_x="LMARGIN", new_y="NEXT")
+    pdf.cell(0, 10, "KALKYLE" if er_manuell else "BADEROMS KALKYLE", new_x="LMARGIN", new_y="NEXT")
     pdf.ln(4)
 
     # Prosjektinfo
-    felter = [
-        ("Prosjekt:", data.get("adresse", "")),
-        ("Dato:", data.get("dato", "")),
-        ("Gulvareal:", f"{data.get('gulvareal', 0):.2f} m\u00b2"),
-        ("Veggareal:", f"{data.get('veggareal', 0):.2f} m\u00b2"),
-    ]
+    if er_manuell:
+        felter = [
+            ("Prosjekt:", data.get("adresse", "")),
+            ("Dato:", data.get("dato", "")),
+        ]
+    else:
+        felter = [
+            ("Prosjekt:", data.get("adresse", "")),
+            ("Dato:", data.get("dato", "")),
+            ("Gulvareal:", f"{data.get('gulvareal', 0):.2f} m\u00b2"),
+            ("Veggareal:", f"{data.get('veggareal', 0):.2f} m\u00b2"),
+        ]
     for etikett, verdi in felter:
         pdf.set_font("Helvetica", "B", 10)
         pdf.cell(28, 6, etikett)
@@ -116,11 +123,14 @@ def generer_pdf(data):
 
     kol_b = [80, 22, 18, 32, 38]  # Post, Mengde, Enhet, Enh.pris, Sum = 190
 
-    # Flisarbeider
-    _pdf_seksjon(pdf, "Flisarbeider", data.get("flis_poster", []), kol_b)
+    if er_manuell:
+        _pdf_seksjon(pdf, "Poster", data.get("poster", []), kol_b)
+    else:
+        # Flisarbeider
+        _pdf_seksjon(pdf, "Flisarbeider", data.get("flis_poster", []), kol_b)
 
-    # Tømrerarbeider
-    _pdf_seksjon(pdf, "Tømrerarbeider", data.get("tomrer_poster", []), kol_b)
+        # Tømrerarbeider
+        _pdf_seksjon(pdf, "Tømrerarbeider", data.get("tomrer_poster", []), kol_b)
 
     # Totaler
     pdf.ln(2)
@@ -253,22 +263,33 @@ def generer_excel(data):
     ws.cell(row=rad, column=1, value=f"{FIRMA['adresse']}  |  {FIRMA['epost']}").font = stiler["normal"]
     rad += 2
 
-    ws.cell(row=rad, column=1, value="BADEROMS KALKYLE").font = stiler["tittel"]
+    er_manuell = data.get("kalkyle_type") == "manuell"
+    ws.cell(row=rad, column=1, value="KALKYLE" if er_manuell else "BADEROMS KALKYLE").font = stiler["tittel"]
     rad += 2
 
-    for etikett, verdi in [
-        ("Prosjekt:", data.get("adresse", "")),
-        ("Dato:", data.get("dato", "")),
-        ("Gulvareal:", f"{data.get('gulvareal', 0):.2f} m\u00b2"),
-        ("Veggareal:", f"{data.get('veggareal', 0):.2f} m\u00b2"),
-    ]:
+    if er_manuell:
+        info_felter = [
+            ("Prosjekt:", data.get("adresse", "")),
+            ("Dato:", data.get("dato", "")),
+        ]
+    else:
+        info_felter = [
+            ("Prosjekt:", data.get("adresse", "")),
+            ("Dato:", data.get("dato", "")),
+            ("Gulvareal:", f"{data.get('gulvareal', 0):.2f} m\u00b2"),
+            ("Veggareal:", f"{data.get('veggareal', 0):.2f} m\u00b2"),
+        ]
+    for etikett, verdi in info_felter:
         ws.cell(row=rad, column=1, value=etikett).font = stiler["bold"]
         ws.cell(row=rad, column=2, value=verdi).font = stiler["normal"]
         rad += 1
     rad += 1
 
-    rad = _excel_seksjon(ws, rad, "Flisarbeider", data.get("flis_poster", []), stiler)
-    rad = _excel_seksjon(ws, rad, "Tømrerarbeider", data.get("tomrer_poster", []), stiler)
+    if er_manuell:
+        rad = _excel_seksjon(ws, rad, "Poster", data.get("poster", []), stiler)
+    else:
+        rad = _excel_seksjon(ws, rad, "Flisarbeider", data.get("flis_poster", []), stiler)
+        rad = _excel_seksjon(ws, rad, "Tømrerarbeider", data.get("tomrer_poster", []), stiler)
 
     # Totaler
     tillegg_pst = data.get("tillegg_pst", 0)
