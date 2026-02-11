@@ -729,6 +729,10 @@ if st.session_state.get("side") == "manuell_kalkyle":
     else:
         m_adresse = st.session_state.get("m_adresse", "")
 
+        m_epost_navn = st.text_input("Kalkylenavn i e-post", key="m_epost_navn",
+                                      value=f"Kalkyle – {m_adresse}" if m_adresse else "Kalkyle",
+                                      placeholder="F.eks. Kalkyle – Storgata 1")
+
         st.markdown("**Hurtigsending:**")
         m_k_chr, m_k_mar = st.columns(2)
         with m_k_chr:
@@ -746,10 +750,10 @@ if st.session_state.get("side") == "manuell_kalkyle":
                     "bruker": st.secrets["smtp"]["bruker"],
                     "passord": st.secrets["smtp"]["passord"],
                 }
-                emne = f"Kalkyle – {m_adresse}"
+                emne = m_epost_navn
                 brodtekst = (
                     f"Hei,\n\n"
-                    f"Vedlagt finner du kalkyle for {m_adresse}.\n"
+                    f"Vedlagt finner du {m_epost_navn.lower()}.\n"
                     f"Total inkl. mva: {fmt(total_inkl)} kr\n\n"
                     f"Med vennlig hilsen\n{FIRMA['navn']}\n{FIRMA['telefon']}\n{FIRMA['epost']}"
                 )
@@ -787,10 +791,10 @@ if st.session_state.get("side") == "manuell_kalkyle":
                         vedlegg_liste.append((f"{filnavn}.xlsx", generer_excel(eksport_data),
                                               "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"))
 
-                    emne = f"Kalkyle – {m_adresse}"
+                    emne = m_epost_navn
                     brodtekst = (
                         f"Hei,\n\n"
-                        f"Vedlagt finner du kalkyle for {m_adresse}.\n"
+                        f"Vedlagt finner du {m_epost_navn.lower()}.\n"
                         f"Total inkl. mva: {fmt(total_inkl)} kr\n\n"
                         f"Med vennlig hilsen\n{FIRMA['navn']}\n{FIRMA['telefon']}\n{FIRMA['epost']}"
                     )
