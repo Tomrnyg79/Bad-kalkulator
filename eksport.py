@@ -357,10 +357,11 @@ def send_epost(mottaker, emne, brødtekst, vedlegg, smtp_config):
     msg.attach(MIMEText(brødtekst, "plain", "utf-8"))
 
     for filnavn, data, mime in vedlegg:
-        del_obj = MIMEBase("application", "octet-stream")
+        maintype, subtype = mime.split("/", 1)
+        del_obj = MIMEBase(maintype, subtype)
         del_obj.set_payload(data)
         encoders.encode_base64(del_obj)
-        del_obj.add_header("Content-Disposition", f"attachment; filename={filnavn}")
+        del_obj.add_header("Content-Disposition", "attachment", filename=filnavn)
         msg.attach(del_obj)
 
     with smtplib.SMTP(smtp_config["host"], smtp_config["port"]) as server:
