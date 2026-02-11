@@ -719,6 +719,91 @@ if st.session_state.get("side") == "manuell_kalkyle":
             use_container_width=True,
         )
 
+    # --- E-post ---
+    st.divider()
+    st.subheader("Send på e-post")
+
+    m_har_smtp = hasattr(st, "secrets") and "smtp" in st.secrets
+    if not m_har_smtp:
+        st.warning("E-post er ikke konfigurert. Legg til SMTP-innstillinger i .streamlit/secrets.toml")
+    else:
+        m_adresse = st.session_state.get("m_adresse", "")
+
+        st.markdown("**Hurtigsending:**")
+        m_k_chr, m_k_mar = st.columns(2)
+        with m_k_chr:
+            m_send_christian = st.button("Send til Christian", use_container_width=True, key="m_send_chr")
+        with m_k_mar:
+            m_send_mariann = st.button("Send til Mari-ann", use_container_width=True, key="m_send_mar")
+
+        if m_send_christian or m_send_mariann:
+            m_hurtig_mottaker = "christian@sostreneamundsen.no" if m_send_christian else "ma@sostreneamundsen.no"
+            m_hurtig_navn = "Christian" if m_send_christian else "Mari-ann"
+            try:
+                smtp_config = {
+                    "host": st.secrets["smtp"]["host"],
+                    "port": int(st.secrets["smtp"]["port"]),
+                    "bruker": st.secrets["smtp"]["bruker"],
+                    "passord": st.secrets["smtp"]["passord"],
+                }
+                emne = f"Kalkyle – {m_adresse}"
+                brodtekst = (
+                    f"Hei,\n\n"
+                    f"Vedlagt finner du kalkyle for {m_adresse}.\n"
+                    f"Total inkl. mva: {fmt(total_inkl)} kr\n\n"
+                    f"Med vennlig hilsen\n{FIRMA['navn']}\n{FIRMA['telefon']}\n{FIRMA['epost']}"
+                )
+                vedlegg_liste = [(f"{filnavn}.pdf", generer_pdf(eksport_data), "application/pdf")]
+                send_epost(m_hurtig_mottaker, emne, brodtekst, vedlegg_liste, smtp_config)
+                st.success(f"Kalkyle sendt til {m_hurtig_navn} ({m_hurtig_mottaker})!")
+            except Exception as e:
+                st.error(f"Kunne ikke sende: {e}")
+
+        st.divider()
+        st.markdown("**Eller send til annen mottaker:**")
+        m_epost_mottaker = st.text_input("Mottakers e-postadresse", key="m_epost_mottaker",
+                                          placeholder="kunde@eksempel.no")
+        m_epost_kopi = st.text_input("Kopi til (valgfritt)", key="m_epost_kopi",
+                                      placeholder="din@epost.no")
+
+        m_vedlegg_valg = st.multiselect("Vedlegg", ["PDF", "Excel"], default=["PDF"], key="m_vedlegg_valg")
+
+        if st.button("Send kalkyle på e-post", use_container_width=True, type="primary", key="m_send_epost"):
+            if not m_epost_mottaker or "@" not in m_epost_mottaker:
+                st.error("Vennligst fyll inn en gyldig e-postadresse.")
+            else:
+                try:
+                    smtp_config = {
+                        "host": st.secrets["smtp"]["host"],
+                        "port": int(st.secrets["smtp"]["port"]),
+                        "bruker": st.secrets["smtp"]["bruker"],
+                        "passord": st.secrets["smtp"]["passord"],
+                    }
+
+                    vedlegg_liste = []
+                    if "PDF" in m_vedlegg_valg:
+                        vedlegg_liste.append((f"{filnavn}.pdf", generer_pdf(eksport_data), "application/pdf"))
+                    if "Excel" in m_vedlegg_valg:
+                        vedlegg_liste.append((f"{filnavn}.xlsx", generer_excel(eksport_data),
+                                              "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"))
+
+                    emne = f"Kalkyle – {m_adresse}"
+                    brodtekst = (
+                        f"Hei,\n\n"
+                        f"Vedlagt finner du kalkyle for {m_adresse}.\n"
+                        f"Total inkl. mva: {fmt(total_inkl)} kr\n\n"
+                        f"Med vennlig hilsen\n{FIRMA['navn']}\n{FIRMA['telefon']}\n{FIRMA['epost']}"
+                    )
+
+                    send_epost(m_epost_mottaker, emne, brodtekst, vedlegg_liste, smtp_config)
+
+                    if m_epost_kopi and "@" in m_epost_kopi:
+                        send_epost(m_epost_kopi, emne, brodtekst, vedlegg_liste, smtp_config)
+
+                    st.success(f"Kalkyle sendt til {m_epost_mottaker}!")
+                except Exception as e:
+                    st.error(f"Kunne ikke sende e-post: {e}")
+
     # Lagre som prosjekt
     if sheets_er_konfigurert():
         st.divider()
