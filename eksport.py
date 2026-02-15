@@ -16,7 +16,7 @@ from openpyxl import Workbook
 from openpyxl.styles import Font, Alignment, Border, Side, PatternFill
 
 import pathlib
-from priser import FIRMA, MVA_SATS
+from priser import FIRMA, MVA_SATS, TOMRER
 
 _LOGO = pathlib.Path(__file__).parent / "unnamed.jpg"
 
@@ -530,5 +530,132 @@ def generer_bilde_dokument_pdf(tittel, bilder):
         pdf.set_text_color(100, 100, 100)
         pdf.cell(0, 4, bilde_navn, align="C", new_x="LMARGIN", new_y="NEXT")
         pdf.set_text_color(0, 0, 0)
+
+    return bytes(pdf.output())
+
+
+# ---------------------------------------------------------------------------
+# Timeliste-PDF
+# ---------------------------------------------------------------------------
+
+def generer_timeliste_pdf(data):
+    """Generer en PDF-timeliste for ekstraarbeid.
+
+    data: dict med nøkler:
+        prosjektnr  – prosjektnummer (str)
+        rader       – liste med dict: dato (str dd.mm.yyyy), dag (str), timer (float), beskrivelse (str)
+        sum_timer   – totalt antall timer
+        timepris    – pris per time eks. mva
+        belop_eks   – sum_timer * timepris
+        mva         – belop_eks * 0.25
+        total_inkl  – belop_eks + mva
+    """
+    pdf = FPDF()
+    pdf.add_page()
+    pdf.set_auto_page_break(auto=True, margin=15)
+
+    # Firmaheader med logo (samme mønster som andre PDFer)
+    pdf.set_font("Helvetica", "B", 20)
+    if _LOGO.exists():
+        pdf.image(str(_LOGO), x=10, y=10, w=50)
+        pdf.set_y(10)
+        pdf.cell(55)
+    pdf.cell(0, 10, FIRMA["navn"], new_x="LMARGIN", new_y="NEXT")
+    if _LOGO.exists():
+        pdf.set_x(65)
+    pdf.set_font("Helvetica", "", 9)
+    pdf.cell(0, 4, f"Org.nr: {FIRMA['orgnr']}  |  Tlf: {FIRMA['telefon']}", new_x="LMARGIN", new_y="NEXT")
+    if _LOGO.exists():
+        pdf.set_x(65)
+    pdf.cell(0, 4, f"{FIRMA['adresse']}  |  {FIRMA['epost']}", new_x="LMARGIN", new_y="NEXT")
+    if _LOGO.exists():
+        pdf.set_y(max(pdf.get_y(), 40))
+
+    pdf.ln(3)
+    pdf.set_draw_color(180, 180, 180)
+    pdf.line(10, pdf.get_y(), 200, pdf.get_y())
+    pdf.ln(6)
+
+    # Tittel
+    pdf.set_font("Helvetica", "B", 18)
+    pdf.cell(0, 10, "TIMELISTE", new_x="LMARGIN", new_y="NEXT")
+    pdf.ln(4)
+
+    # Prosjektinfo
+    rader = data.get("rader", [])
+    datoer = [r["dato"] for r in rader if r.get("dato")]
+    datoperiode = ""
+    if datoer:
+        datoperiode = f"{datoer[0]} - {datoer[-1]}" if len(datoer) > 1 else datoer[0]
+
+    felter = [
+        ("Prosjektnr:", data.get("prosjektnr", "")),
+        ("Periode:", datoperiode),
+        ("Timepris:", f"{fmt(TOMRER['timepris'])} kr/t eks. mva"),
+    ]
+    for etikett, verdi in felter:
+        pdf.set_font("Helvetica", "B", 10)
+        pdf.cell(28, 6, etikett)
+        pdf.set_font("Helvetica", "", 10)
+        pdf.cell(0, 6, verdi, new_x="LMARGIN", new_y="NEXT")
+
+    pdf.ln(6)
+
+    # Tabell: Dag | Dato | Timer | Beskrivelse
+    kol_b = [25, 28, 20, 117]  # = 190
+    overskrifter = ["Dag", "Dato", "Timer", "Beskrivelse"]
+
+    pdf.set_font("Helvetica", "B", 9)
+    pdf.set_fill_color(50, 50, 50)
+    pdf.set_text_color(255, 255, 255)
+    for i, h in enumerate(overskrifter):
+        pdf.cell(kol_b[i], 7, h, border=1, fill=True, align="C")
+    pdf.ln()
+
+    pdf.set_text_color(0, 0, 0)
+    pdf.set_font("Helvetica", "", 9)
+    skravur = False
+    for rad in rader:
+        pdf.set_fill_color(245, 245, 245) if skravur else pdf.set_fill_color(255, 255, 255)
+        pdf.cell(kol_b[0], 6, rad.get("dag", ""), border=1, fill=True)
+        pdf.cell(kol_b[1], 6, rad.get("dato", ""), border=1, fill=True, align="C")
+        pdf.cell(kol_b[2], 6, f"{rad.get('timer', 0):.1f}", border=1, fill=True, align="R")
+        pdf.cell(kol_b[3], 6, rad.get("beskrivelse", ""), border=1, fill=True)
+        pdf.ln()
+        skravur = not skravur
+
+    # Totalrad - sum timer
+    pdf.set_font("Helvetica", "B", 9)
+    pdf.set_fill_color(230, 230, 230)
+    pdf.cell(kol_b[0] + kol_b[1], 7, "Sum timer", border=1, fill=True)
+    pdf.cell(kol_b[2], 7, f"{data.get('sum_timer', 0):.1f}", border=1, fill=True, align="R")
+    pdf.cell(kol_b[3], 7, "", border=1, fill=True)
+    pdf.ln()
+
+    # Totaler
+    pdf.ln(4)
+    tom_b = kol_b[0] + kol_b[1]
+    label_w = kol_b[2] + 50
+    val_w = kol_b[3] - 50
+
+    pdf.set_font("Helvetica", "", 10)
+    pdf.cell(tom_b, 6, "")
+    pdf.cell(label_w, 6, "Sum eks. mva:", align="R")
+    pdf.cell(val_w, 6, f"{fmt(data.get('belop_eks', 0))} kr", align="R")
+    pdf.ln()
+
+    pdf.cell(tom_b, 6, "")
+    pdf.cell(label_w, 6, "MVA 25%:", align="R")
+    pdf.cell(val_w, 6, f"{fmt(data.get('mva', 0))} kr", align="R")
+    pdf.ln()
+
+    pdf.set_draw_color(0, 0, 0)
+    pdf.line(10 + tom_b, pdf.get_y(), 200, pdf.get_y())
+    pdf.ln(1)
+
+    pdf.set_font("Helvetica", "B", 12)
+    pdf.cell(tom_b, 8, "")
+    pdf.cell(label_w, 8, "Total inkl. mva:", align="R")
+    pdf.cell(val_w, 8, f"{fmt(data.get('total_inkl', 0))} kr", align="R")
 
     return bytes(pdf.output())

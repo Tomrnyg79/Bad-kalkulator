@@ -4,7 +4,7 @@ import datetime
 import re
 
 from priser import FIRMA, MVA_SATS, FLIS, TOMRER, EPOXY_VALG
-from eksport import generer_pdf, generer_excel, send_epost, generer_tekst_dokument_pdf, generer_bilde_dokument_pdf, generer_kontaktliste_pdf
+from eksport import generer_pdf, generer_excel, send_epost, generer_tekst_dokument_pdf, generer_bilde_dokument_pdf, generer_kontaktliste_pdf, generer_timeliste_pdf
 from prosjekter import (lagre_prosjekt, oppdater_prosjekt, hent_alle_prosjekter, last_prosjekt,
                          sheets_er_konfigurert, slett_prosjekt,
                          hent_kontakter, lagre_kontakter,
@@ -360,12 +360,21 @@ if st.session_state.get("side", "hjem") == "hjem":
     )
 
     # Knapperad
-    _hjem_k1, _hjem_k2 = st.columns(2)
+    _hjem_k1, _hjem_k2, _hjem_k3 = st.columns(3)
     with _hjem_k1:
         if st.button("Ny kalkyle", use_container_width=True, type="primary"):
             st.session_state["side"] = "velg_kalkyle_type"
             st.rerun()
     with _hjem_k2:
+        if st.button("Ny timeliste", use_container_width=True, type="primary"):
+            autentisert = st.session_state.get("autentisert")
+            bruker = st.session_state.get("bruker")
+            for nk in list(st.session_state.keys()):
+                if nk.startswith("tl_"):
+                    del st.session_state[nk]
+            st.session_state["side"] = "timeliste"
+            st.rerun()
+    with _hjem_k3:
         if imap_er_konfigurert():
             if st.button("Sjekk e-post", use_container_width=True):
                 try:
@@ -837,6 +846,141 @@ if st.session_state.get("side") == "manuell_kalkyle":
 
     st.divider()
     if st.button("← Tilbake til hjem", use_container_width=False):
+        st.session_state["side"] = "hjem"
+        st.rerun()
+
+    st.stop()
+
+# ===================================================================
+# TIMELISTE (side == "timeliste")
+# ===================================================================
+if st.session_state.get("side") == "timeliste":
+    if _logo.exists():
+        col1, col2, col3 = st.columns([1, 1, 1])
+        with col2:
+            st.image(str(_logo), use_container_width=True)
+    st.markdown(
+        "<h2 style='text-align:center; color:#555; margin-top:0'>Timeliste</h2>",
+        unsafe_allow_html=True,
+    )
+
+    _DAGNAVN = {0: "Mandag", 1: "Tirsdag", 2: "Onsdag", 3: "Torsdag",
+                4: "Fredag", 5: "Lørdag", 6: "Søndag"}
+
+    # Prosjektnummer
+    st.text_input("Prosjektnummer", placeholder="F.eks. 2024-001", key="tl_prosjektnr")
+
+    st.divider()
+    st.subheader("Timeregistrering")
+
+    # Dynamiske rader
+    if "tl_antall_rader" not in st.session_state:
+        st.session_state["tl_antall_rader"] = 1
+
+    tl_antall = st.session_state["tl_antall_rader"]
+
+    _thc1, _thc2, _thc3, _thc4 = st.columns([1.2, 1, 0.8, 3])
+    with _thc1:
+        st.caption("Dato")
+    with _thc2:
+        st.caption("Dag")
+    with _thc3:
+        st.caption("Timer")
+    with _thc4:
+        st.caption("Beskrivelse")
+
+    for i in range(tl_antall):
+        _tc1, _tc2, _tc3, _tc4 = st.columns([1.2, 1, 0.8, 3])
+        with _tc1:
+            st.date_input("Dato", key=f"tl_dato_{i}", label_visibility="collapsed",
+                          value=datetime.date.today())
+        with _tc2:
+            dato_val = st.session_state.get(f"tl_dato_{i}", datetime.date.today())
+            if isinstance(dato_val, datetime.date):
+                dag_tekst = _DAGNAVN.get(dato_val.weekday(), "")
+            else:
+                dag_tekst = ""
+            st.text_input("Dag", value=dag_tekst, key=f"tl_dag_{i}",
+                          label_visibility="collapsed", disabled=True)
+        with _tc3:
+            st.number_input("Timer", min_value=0.0, step=0.5, format="%.1f",
+                            key=f"tl_timer_{i}", label_visibility="collapsed")
+        with _tc4:
+            st.text_input("Beskrivelse", key=f"tl_beskr_{i}", label_visibility="collapsed",
+                          placeholder="Beskrivelse av arbeid")
+
+    _tb1, _tb2, _ = st.columns([1, 1, 2])
+    with _tb1:
+        if st.button("+ Legg til rad", use_container_width=True):
+            st.session_state["tl_antall_rader"] += 1
+            st.rerun()
+    with _tb2:
+        if tl_antall > 1:
+            if st.button("- Fjern siste", use_container_width=True, key="tl_fjern"):
+                siste = tl_antall - 1
+                for k in [f"tl_dato_{siste}", f"tl_dag_{siste}", f"tl_timer_{siste}", f"tl_beskr_{siste}"]:
+                    if k in st.session_state:
+                        del st.session_state[k]
+                st.session_state["tl_antall_rader"] -= 1
+                st.rerun()
+
+    # Beregn totaler
+    timepris = TOMRER["timepris"]
+    sum_timer = 0.0
+    tl_rader = []
+    for i in range(tl_antall):
+        dato_val = st.session_state.get(f"tl_dato_{i}", datetime.date.today())
+        if isinstance(dato_val, datetime.date):
+            dag_tekst = _DAGNAVN.get(dato_val.weekday(), "")
+            dato_str = dato_val.strftime("%d.%m.%Y")
+        else:
+            dag_tekst = ""
+            dato_str = ""
+        timer_val = st.session_state.get(f"tl_timer_{i}", 0.0)
+        beskr_val = st.session_state.get(f"tl_beskr_{i}", "")
+        sum_timer += timer_val
+        tl_rader.append({
+            "dag": dag_tekst,
+            "dato": dato_str,
+            "timer": timer_val,
+            "beskrivelse": beskr_val,
+        })
+
+    belop_eks = round(sum_timer * timepris)
+    tl_mva = round(belop_eks * MVA_SATS)
+    total_inkl = belop_eks + tl_mva
+
+    # Totalvisning
+    st.divider()
+    _, _kol_total = st.columns([2, 2])
+    with _kol_total:
+        st.markdown(f"**Sum timer:** {sum_timer:.1f}")
+        st.markdown(f"**Timepris:** {fmt(timepris)} kr/t")
+        st.markdown(f"**Sum eks. mva:** {fmt(belop_eks)} kr")
+        st.markdown(f"**MVA 25%:** {fmt(tl_mva)} kr")
+        st.markdown(f"### Total inkl. mva: {fmt(total_inkl)} kr")
+
+    # PDF-eksport
+    tl_eksport_data = {
+        "prosjektnr": st.session_state.get("tl_prosjektnr", ""),
+        "rader": tl_rader,
+        "sum_timer": sum_timer,
+        "timepris": timepris,
+        "belop_eks": belop_eks,
+        "mva": tl_mva,
+        "total_inkl": total_inkl,
+    }
+
+    st.divider()
+    prosjektnr_fil = trygt_filnavn(st.session_state.get("tl_prosjektnr", "timeliste"))
+    tl_filnavn = f"timeliste_{prosjektnr_fil}_{datetime.date.today()}"
+    st.download_button(
+        "Last ned PDF", generer_timeliste_pdf(tl_eksport_data),
+        f"{tl_filnavn}.pdf", "application/pdf", use_container_width=True,
+    )
+
+    st.divider()
+    if st.button("← Tilbake til hjem", use_container_width=False, key="tl_tilbake"):
         st.session_state["side"] = "hjem"
         st.rerun()
 
