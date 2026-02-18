@@ -539,17 +539,7 @@ def generer_bilde_dokument_pdf(tittel, bilder):
 # ---------------------------------------------------------------------------
 
 def generer_timeliste_pdf(data):
-    """Generer en PDF-timeliste for ekstraarbeid.
-
-    data: dict med nøkler:
-        prosjektnr  – prosjektnummer (str)
-        rader       – liste med dict: dato (str dd.mm.yyyy), dag (str), timer (float), beskrivelse (str)
-        sum_timer   – totalt antall timer
-        timepris    – pris per time eks. mva
-        belop_eks   – sum_timer * timepris
-        mva         – belop_eks * 0.25
-        total_inkl  – belop_eks + mva
-    """
+    """Generer en PDF-timeliste for ekstraarbeid med støtte for flere personer."""
     pdf = FPDF()
     pdf.add_page()
     pdf.set_auto_page_break(auto=True, margin=15)
@@ -582,11 +572,15 @@ def generer_timeliste_pdf(data):
     pdf.ln(4)
 
     # Prosjektinfo
-    rader = data.get("rader", [])
-    datoer = [r["dato"] for r in rader if r.get("dato")]
+    personer = data.get("personer", [])
+    alle_datoer = []
+    for pers in personer:
+        for r in pers.get("rader", []):
+            if r.get("dato"):
+                alle_datoer.append(r["dato"])
     datoperiode = ""
-    if datoer:
-        datoperiode = f"{datoer[0]} - {datoer[-1]}" if len(datoer) > 1 else datoer[0]
+    if alle_datoer:
+        datoperiode = f"{alle_datoer[0]} - {alle_datoer[-1]}" if len(alle_datoer) > 1 else alle_datoer[0]
 
     felter = [
         ("Prosjektnr:", data.get("prosjektnr", "")),
@@ -594,7 +588,6 @@ def generer_timeliste_pdf(data):
         ("Prosjekt:", data.get("prosjekt_beskr", "")),
         ("Kontakt:", data.get("kontakt", "")),
         ("Adresse:", data.get("adresse", "")),
-        ("Navn:", data.get("navn", "")),
         ("Periode:", datoperiode),
         ("Timepris:", f"{fmt(TOMRER['timepris'])} kr/t eks. mva"),
     ]
@@ -606,45 +599,64 @@ def generer_timeliste_pdf(data):
 
     pdf.ln(6)
 
-    # Tabell: Dag | Dato | Fra | Til | Timer | Beskrivelse
     kol_b = [22, 26, 16, 16, 16, 94]  # = 190
     overskrifter = ["Dag", "Dato", "Fra", "Til", "Timer", "Beskrivelse"]
 
-    pdf.set_font("Helvetica", "B", 9)
-    pdf.set_fill_color(50, 50, 50)
-    pdf.set_text_color(255, 255, 255)
-    for i, h in enumerate(overskrifter):
-        pdf.cell(kol_b[i], 7, h, border=1, fill=True, align="C")
-    pdf.ln()
+    # Tabell per person
+    for pers in personer:
+        navn = pers.get("navn", "")
+        rader = pers.get("rader", [])
+        pers_timer = pers.get("sum_timer", 0)
 
-    pdf.set_text_color(0, 0, 0)
-    pdf.set_font("Helvetica", "", 9)
-    skravur = False
-    for rad in rader:
-        pdf.set_fill_color(245, 245, 245) if skravur else pdf.set_fill_color(255, 255, 255)
-        pdf.cell(kol_b[0], 6, rad.get("dag", ""), border=1, fill=True)
-        pdf.cell(kol_b[1], 6, rad.get("dato", ""), border=1, fill=True, align="C")
-        pdf.cell(kol_b[2], 6, rad.get("fra", ""), border=1, fill=True, align="C")
-        pdf.cell(kol_b[3], 6, rad.get("til", ""), border=1, fill=True, align="C")
-        pdf.cell(kol_b[4], 6, f"{rad.get('timer', 0):.1f}", border=1, fill=True, align="R")
-        pdf.cell(kol_b[5], 6, rad.get("beskrivelse", ""), border=1, fill=True)
+        # Person-overskrift
+        pdf.set_font("Helvetica", "B", 11)
+        pdf.set_text_color(0, 0, 0)
+        pdf.cell(0, 8, navn or "Uten navn", new_x="LMARGIN", new_y="NEXT")
+
+        # Tabell-overskrift
+        pdf.set_font("Helvetica", "B", 9)
+        pdf.set_fill_color(50, 50, 50)
+        pdf.set_text_color(255, 255, 255)
+        for i, h in enumerate(overskrifter):
+            pdf.cell(kol_b[i], 7, h, border=1, fill=True, align="C")
         pdf.ln()
-        skravur = not skravur
 
-    # Totalrad - sum timer
-    pdf.set_font("Helvetica", "B", 9)
-    pdf.set_fill_color(230, 230, 230)
-    pdf.cell(kol_b[0] + kol_b[1] + kol_b[2] + kol_b[3], 7, "Sum timer", border=1, fill=True)
-    pdf.cell(kol_b[4], 7, f"{data.get('sum_timer', 0):.1f}", border=1, fill=True, align="R")
-    pdf.cell(kol_b[5], 7, "", border=1, fill=True)
-    pdf.ln()
+        pdf.set_text_color(0, 0, 0)
+        pdf.set_font("Helvetica", "", 9)
+        skravur = False
+        for rad in rader:
+            pdf.set_fill_color(245, 245, 245) if skravur else pdf.set_fill_color(255, 255, 255)
+            pdf.cell(kol_b[0], 6, rad.get("dag", ""), border=1, fill=True)
+            pdf.cell(kol_b[1], 6, rad.get("dato", ""), border=1, fill=True, align="C")
+            pdf.cell(kol_b[2], 6, rad.get("fra", ""), border=1, fill=True, align="C")
+            pdf.cell(kol_b[3], 6, rad.get("til", ""), border=1, fill=True, align="C")
+            pdf.cell(kol_b[4], 6, f"{rad.get('timer', 0):.1f}", border=1, fill=True, align="R")
+            pdf.cell(kol_b[5], 6, rad.get("beskrivelse", ""), border=1, fill=True)
+            pdf.ln()
+            skravur = not skravur
+
+        # Sum timer for personen
+        pdf.set_font("Helvetica", "B", 9)
+        pdf.set_fill_color(230, 230, 230)
+        pdf.cell(kol_b[0] + kol_b[1] + kol_b[2] + kol_b[3], 7,
+                 f"Sum timer {navn}".strip(), border=1, fill=True)
+        pdf.cell(kol_b[4], 7, f"{pers_timer:.1f}", border=1, fill=True, align="R")
+        pdf.cell(kol_b[5], 7, "", border=1, fill=True)
+        pdf.ln()
+        pdf.ln(6)
 
     # Totaler
-    pdf.ln(4)
     tom_b = kol_b[0] + kol_b[1] + kol_b[2] + kol_b[3]
     label_w = kol_b[4] + 30
     val_w = kol_b[5] - 30
 
+    pdf.set_font("Helvetica", "B", 10)
+    pdf.cell(tom_b, 7, "")
+    pdf.cell(label_w, 7, "Sum timer totalt:", align="R")
+    pdf.cell(val_w, 7, f"{data.get('sum_timer', 0):.1f}", align="R")
+    pdf.ln()
+
+    pdf.ln(2)
     pdf.set_font("Helvetica", "", 10)
     pdf.cell(tom_b, 6, "")
     pdf.cell(label_w, 6, "Sum eks. mva:", align="R")

@@ -872,20 +872,15 @@ if st.session_state.get("side") == "timeliste":
     with _tl_info1:
         st.text_input("Prosjektnummer", placeholder="F.eks. 2024-001", key="tl_prosjektnr")
     with _tl_info2:
-        st.text_input("Navn (ansatt)", placeholder="Navn på person", key="tl_navn")
+        st.text_input("Beskrivelse av prosjekt", placeholder="Kort beskrivelse", key="tl_prosjekt_beskr")
     _tl_info3, _tl_info4 = st.columns(2)
     with _tl_info3:
         st.text_input("Kunde", placeholder="Kundens navn", key="tl_kunde")
     with _tl_info4:
-        st.text_input("Beskrivelse av prosjekt", placeholder="Kort beskrivelse", key="tl_prosjekt_beskr")
-    _tl_info5, _tl_info6 = st.columns(2)
-    with _tl_info5:
         st.text_input("Kontaktperson", placeholder="Kontaktperson hos kunde", key="tl_kontakt")
-    with _tl_info6:
-        st.text_input("Adresse", placeholder="Prosjektadresse", key="tl_adresse")
+    st.text_input("Adresse", placeholder="Prosjektadresse", key="tl_adresse")
 
     st.divider()
-    st.subheader("Timeregistrering")
 
     # Tidsvalg i halvtimes-intervaller
     _TIDSVALG = [f"{h:02d}:{m:02d}" for h in range(24) for m in (0, 30)]
@@ -894,83 +889,123 @@ if st.session_state.get("side") == "timeliste":
         h, m = tid_str.split(":")
         return int(h) * 60 + int(m)
 
-    # Dynamiske rader
-    if "tl_antall_rader" not in st.session_state:
-        st.session_state["tl_antall_rader"] = 1
+    # --- Flere personer ---
+    if "tl_antall_personer" not in st.session_state:
+        st.session_state["tl_antall_personer"] = 1
 
-    tl_antall = st.session_state["tl_antall_rader"]
+    tl_antall_pers = st.session_state["tl_antall_personer"]
 
-    for i in range(tl_antall):
-        st.markdown(f"**Rad {i + 1}**")
-        _tc1, _tc2, _tc3, _tc4 = st.columns([1.5, 1, 1, 1])
-        with _tc1:
-            st.date_input("Dato", key=f"tl_dato_{i}", label_visibility="visible",
-                          value=datetime.date.today())
-        with _tc2:
-            dato_val = st.session_state.get(f"tl_dato_{i}", datetime.date.today())
+    timepris = TOMRER["timepris"]
+    total_sum_timer = 0.0
+    alle_personer = []
+
+    for p in range(tl_antall_pers):
+        st.subheader(f"Person {p + 1}")
+        st.text_input("Navn", placeholder="Navn på person", key=f"tl_person_navn_{p}")
+
+        if f"tl_antall_rader_{p}" not in st.session_state:
+            st.session_state[f"tl_antall_rader_{p}"] = 1
+
+        antall_rader = st.session_state[f"tl_antall_rader_{p}"]
+
+        person_timer = 0.0
+        person_rader = []
+
+        for i in range(antall_rader):
+            st.markdown(f"**Rad {i + 1}**")
+            _tc1, _tc2, _tc3, _tc4 = st.columns([1.5, 1, 1, 1])
+            with _tc1:
+                st.date_input("Dato", key=f"tl_dato_{p}_{i}", label_visibility="visible",
+                              value=datetime.date.today())
+            with _tc2:
+                dato_val = st.session_state.get(f"tl_dato_{p}_{i}", datetime.date.today())
+                if isinstance(dato_val, datetime.date):
+                    dag_tekst = _DAGNAVN.get(dato_val.weekday(), "")
+                else:
+                    dag_tekst = ""
+                st.markdown("**Dag**")
+                st.markdown(dag_tekst)
+            with _tc3:
+                st.selectbox("Fra", _TIDSVALG, index=_TIDSVALG.index("07:00"),
+                             key=f"tl_fra_{p}_{i}")
+            with _tc4:
+                st.selectbox("Til", _TIDSVALG, index=_TIDSVALG.index("15:00"),
+                             key=f"tl_til_{p}_{i}")
+            fra_str = st.session_state.get(f"tl_fra_{p}_{i}", "07:00")
+            til_str = st.session_state.get(f"tl_til_{p}_{i}", "15:00")
+            diff_timer = max((_tid_til_min(til_str) - _tid_til_min(fra_str)) / 60, 0)
+            st.text_input("Beskrivelse", key=f"tl_beskr_{p}_{i}",
+                          placeholder="Beskrivelse av arbeid")
+            st.caption(f"Timer: {diff_timer:.1f}")
+
+            # Samle data
             if isinstance(dato_val, datetime.date):
-                dag_tekst = _DAGNAVN.get(dato_val.weekday(), "")
+                dato_str = dato_val.strftime("%d.%m.%Y")
             else:
+                dato_str = ""
                 dag_tekst = ""
-            st.markdown("**Dag**")
-            st.markdown(dag_tekst)
-        with _tc3:
-            st.selectbox("Fra", _TIDSVALG, index=_TIDSVALG.index("07:00"),
-                         key=f"tl_fra_{i}")
-        with _tc4:
-            st.selectbox("Til", _TIDSVALG, index=_TIDSVALG.index("15:00"),
-                         key=f"tl_til_{i}")
-        fra_str = st.session_state.get(f"tl_fra_{i}", "07:00")
-        til_str = st.session_state.get(f"tl_til_{i}", "15:00")
-        diff_timer = max((_tid_til_min(til_str) - _tid_til_min(fra_str)) / 60, 0)
-        st.text_input("Beskrivelse", key=f"tl_beskr_{i}",
-                      placeholder="Beskrivelse av arbeid")
-        st.caption(f"Timer: {diff_timer:.1f}")
-        st.divider()
+            person_timer += diff_timer
+            person_rader.append({
+                "dag": dag_tekst,
+                "dato": dato_str,
+                "fra": fra_str,
+                "til": til_str,
+                "timer": diff_timer,
+                "beskrivelse": st.session_state.get(f"tl_beskr_{p}_{i}", ""),
+            })
+            st.divider()
 
-    _tb1, _tb2, _ = st.columns([1, 1, 2])
-    with _tb1:
-        if st.button("+ Legg til rad", use_container_width=True):
-            st.session_state["tl_antall_rader"] += 1
+        # +/- rad-knapper per person
+        _pb1, _pb2, _ = st.columns([1, 1, 2])
+        with _pb1:
+            if st.button("+ Legg til rad", use_container_width=True, key=f"tl_add_rad_{p}"):
+                st.session_state[f"tl_antall_rader_{p}"] += 1
+                st.rerun()
+        with _pb2:
+            if antall_rader > 1:
+                if st.button("- Fjern siste rad", use_container_width=True, key=f"tl_fjern_rad_{p}"):
+                    siste = antall_rader - 1
+                    for k in [f"tl_dato_{p}_{siste}", f"tl_fra_{p}_{siste}",
+                               f"tl_til_{p}_{siste}", f"tl_beskr_{p}_{siste}"]:
+                        if k in st.session_state:
+                            del st.session_state[k]
+                    st.session_state[f"tl_antall_rader_{p}"] -= 1
+                    st.rerun()
+
+        st.caption(f"Sum timer {st.session_state.get(f'tl_person_navn_{p}', f'Person {p+1}')}: {person_timer:.1f}")
+        total_sum_timer += person_timer
+        alle_personer.append({
+            "navn": st.session_state.get(f"tl_person_navn_{p}", ""),
+            "rader": person_rader,
+            "sum_timer": person_timer,
+        })
+        st.markdown("---")
+
+    # +/- person-knapper
+    _ppb1, _ppb2, _ = st.columns([1, 1, 2])
+    with _ppb1:
+        if st.button("+ Legg til person", use_container_width=True, type="primary"):
+            st.session_state["tl_antall_personer"] += 1
             st.rerun()
-    with _tb2:
-        if tl_antall > 1:
-            if st.button("- Fjern siste", use_container_width=True, key="tl_fjern"):
-                siste = tl_antall - 1
-                for k in [f"tl_dato_{siste}", f"tl_fra_{siste}",
-                           f"tl_til_{siste}", f"tl_beskr_{siste}"]:
+    with _ppb2:
+        if tl_antall_pers > 1:
+            if st.button("- Fjern siste person", use_container_width=True):
+                siste_p = tl_antall_pers - 1
+                # Rydd opp session state for siste person
+                siste_rader = st.session_state.get(f"tl_antall_rader_{siste_p}", 1)
+                for i in range(siste_rader):
+                    for k in [f"tl_dato_{siste_p}_{i}", f"tl_fra_{siste_p}_{i}",
+                               f"tl_til_{siste_p}_{i}", f"tl_beskr_{siste_p}_{i}"]:
+                        if k in st.session_state:
+                            del st.session_state[k]
+                for k in [f"tl_person_navn_{siste_p}", f"tl_antall_rader_{siste_p}"]:
                     if k in st.session_state:
                         del st.session_state[k]
-                st.session_state["tl_antall_rader"] -= 1
+                st.session_state["tl_antall_personer"] -= 1
                 st.rerun()
 
     # Beregn totaler
-    timepris = TOMRER["timepris"]
-    sum_timer = 0.0
-    tl_rader = []
-    for i in range(tl_antall):
-        dato_val = st.session_state.get(f"tl_dato_{i}", datetime.date.today())
-        if isinstance(dato_val, datetime.date):
-            dag_tekst = _DAGNAVN.get(dato_val.weekday(), "")
-            dato_str = dato_val.strftime("%d.%m.%Y")
-        else:
-            dag_tekst = ""
-            dato_str = ""
-        fra_str = st.session_state.get(f"tl_fra_{i}", "07:00")
-        til_str = st.session_state.get(f"tl_til_{i}", "15:00")
-        timer_val = max((_tid_til_min(til_str) - _tid_til_min(fra_str)) / 60, 0)
-        beskr_val = st.session_state.get(f"tl_beskr_{i}", "")
-        sum_timer += timer_val
-        tl_rader.append({
-            "dag": dag_tekst,
-            "dato": dato_str,
-            "fra": fra_str,
-            "til": til_str,
-            "timer": timer_val,
-            "beskrivelse": beskr_val,
-        })
-
-    belop_eks = round(sum_timer * timepris)
+    belop_eks = round(total_sum_timer * timepris)
     tl_mva = round(belop_eks * MVA_SATS)
     total_inkl = belop_eks + tl_mva
 
@@ -978,7 +1013,7 @@ if st.session_state.get("side") == "timeliste":
     st.divider()
     _, _kol_total = st.columns([2, 2])
     with _kol_total:
-        st.markdown(f"**Sum timer:** {sum_timer:.1f}")
+        st.markdown(f"**Sum timer totalt:** {total_sum_timer:.1f}")
         st.markdown(f"**Timepris:** {fmt(timepris)} kr/t")
         st.markdown(f"**Sum eks. mva:** {fmt(belop_eks)} kr")
         st.markdown(f"**MVA 25%:** {fmt(tl_mva)} kr")
@@ -987,13 +1022,12 @@ if st.session_state.get("side") == "timeliste":
     # PDF-eksport
     tl_eksport_data = {
         "prosjektnr": st.session_state.get("tl_prosjektnr", ""),
-        "navn": st.session_state.get("tl_navn", ""),
         "kunde": st.session_state.get("tl_kunde", ""),
         "prosjekt_beskr": st.session_state.get("tl_prosjekt_beskr", ""),
         "kontakt": st.session_state.get("tl_kontakt", ""),
         "adresse": st.session_state.get("tl_adresse", ""),
-        "rader": tl_rader,
-        "sum_timer": sum_timer,
+        "personer": alle_personer,
+        "sum_timer": total_sum_timer,
         "timepris": timepris,
         "belop_eks": belop_eks,
         "mva": tl_mva,
