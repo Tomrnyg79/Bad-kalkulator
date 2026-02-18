@@ -903,6 +903,22 @@ if st.session_state.get("side") == "timeliste":
         st.subheader(f"Person {p + 1}")
         st.text_input("Navn", placeholder="Navn på person", key=f"tl_person_navn_{p}")
 
+        # Kopier rader fra Person 1
+        if p > 0:
+            if st.button("Kopier dager fra Person 1", use_container_width=False, key=f"tl_kopier_{p}"):
+                antall_p1 = st.session_state.get("tl_antall_rader_0", 1)
+                st.session_state[f"tl_antall_rader_{p}"] = antall_p1
+                for i in range(antall_p1):
+                    if f"tl_dato_0_{i}" in st.session_state:
+                        st.session_state[f"tl_dato_{p}_{i}"] = st.session_state[f"tl_dato_0_{i}"]
+                    if f"tl_fra_0_{i}" in st.session_state:
+                        st.session_state[f"tl_fra_{p}_{i}"] = st.session_state[f"tl_fra_0_{i}"]
+                    if f"tl_til_0_{i}" in st.session_state:
+                        st.session_state[f"tl_til_{p}_{i}"] = st.session_state[f"tl_til_0_{i}"]
+                    if f"tl_beskr_0_{i}" in st.session_state:
+                        st.session_state[f"tl_beskr_{p}_{i}"] = st.session_state[f"tl_beskr_0_{i}"]
+                st.rerun()
+
         if f"tl_antall_rader_{p}" not in st.session_state:
             st.session_state[f"tl_antall_rader_{p}"] = 1
 
