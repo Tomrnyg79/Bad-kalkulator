@@ -590,6 +590,7 @@ def generer_timeliste_pdf(data):
 
     felter = [
         ("Prosjektnr:", data.get("prosjektnr", "")),
+        ("Navn:", data.get("navn", "")),
         ("Periode:", datoperiode),
         ("Timepris:", f"{fmt(TOMRER['timepris'])} kr/t eks. mva"),
     ]
@@ -601,9 +602,9 @@ def generer_timeliste_pdf(data):
 
     pdf.ln(6)
 
-    # Tabell: Dag | Dato | Timer | Beskrivelse
-    kol_b = [25, 28, 20, 117]  # = 190
-    overskrifter = ["Dag", "Dato", "Timer", "Beskrivelse"]
+    # Tabell: Dag | Dato | Fra | Til | Timer | Beskrivelse
+    kol_b = [22, 26, 16, 16, 16, 94]  # = 190
+    overskrifter = ["Dag", "Dato", "Fra", "Til", "Timer", "Beskrivelse"]
 
     pdf.set_font("Helvetica", "B", 9)
     pdf.set_fill_color(50, 50, 50)
@@ -619,24 +620,26 @@ def generer_timeliste_pdf(data):
         pdf.set_fill_color(245, 245, 245) if skravur else pdf.set_fill_color(255, 255, 255)
         pdf.cell(kol_b[0], 6, rad.get("dag", ""), border=1, fill=True)
         pdf.cell(kol_b[1], 6, rad.get("dato", ""), border=1, fill=True, align="C")
-        pdf.cell(kol_b[2], 6, f"{rad.get('timer', 0):.1f}", border=1, fill=True, align="R")
-        pdf.cell(kol_b[3], 6, rad.get("beskrivelse", ""), border=1, fill=True)
+        pdf.cell(kol_b[2], 6, rad.get("fra", ""), border=1, fill=True, align="C")
+        pdf.cell(kol_b[3], 6, rad.get("til", ""), border=1, fill=True, align="C")
+        pdf.cell(kol_b[4], 6, f"{rad.get('timer', 0):.1f}", border=1, fill=True, align="R")
+        pdf.cell(kol_b[5], 6, rad.get("beskrivelse", ""), border=1, fill=True)
         pdf.ln()
         skravur = not skravur
 
     # Totalrad - sum timer
     pdf.set_font("Helvetica", "B", 9)
     pdf.set_fill_color(230, 230, 230)
-    pdf.cell(kol_b[0] + kol_b[1], 7, "Sum timer", border=1, fill=True)
-    pdf.cell(kol_b[2], 7, f"{data.get('sum_timer', 0):.1f}", border=1, fill=True, align="R")
-    pdf.cell(kol_b[3], 7, "", border=1, fill=True)
+    pdf.cell(kol_b[0] + kol_b[1] + kol_b[2] + kol_b[3], 7, "Sum timer", border=1, fill=True)
+    pdf.cell(kol_b[4], 7, f"{data.get('sum_timer', 0):.1f}", border=1, fill=True, align="R")
+    pdf.cell(kol_b[5], 7, "", border=1, fill=True)
     pdf.ln()
 
     # Totaler
     pdf.ln(4)
-    tom_b = kol_b[0] + kol_b[1]
-    label_w = kol_b[2] + 50
-    val_w = kol_b[3] - 50
+    tom_b = kol_b[0] + kol_b[1] + kol_b[2] + kol_b[3]
+    label_w = kol_b[4] + 30
+    val_w = kol_b[5] - 30
 
     pdf.set_font("Helvetica", "", 10)
     pdf.cell(tom_b, 6, "")

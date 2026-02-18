@@ -867,8 +867,12 @@ if st.session_state.get("side") == "timeliste":
     _DAGNAVN = {0: "Mandag", 1: "Tirsdag", 2: "Onsdag", 3: "Torsdag",
                 4: "Fredag", 5: "Lørdag", 6: "Søndag"}
 
-    # Prosjektnummer
-    st.text_input("Prosjektnummer", placeholder="F.eks. 2024-001", key="tl_prosjektnr")
+    # Prosjektnummer og navn
+    _tl_info1, _tl_info2 = st.columns(2)
+    with _tl_info1:
+        st.text_input("Prosjektnummer", placeholder="F.eks. 2024-001", key="tl_prosjektnr")
+    with _tl_info2:
+        st.text_input("Navn", placeholder="Navn på person", key="tl_navn")
 
     st.divider()
     st.subheader("Timeregistrering")
@@ -879,18 +883,22 @@ if st.session_state.get("side") == "timeliste":
 
     tl_antall = st.session_state["tl_antall_rader"]
 
-    _thc1, _thc2, _thc3, _thc4 = st.columns([1.2, 1, 0.8, 3])
+    _thc1, _thc2, _thc3, _thc4, _thc5, _thc6 = st.columns([1.2, 1, 0.7, 0.7, 0.5, 3])
     with _thc1:
         st.caption("Dato")
     with _thc2:
         st.caption("Dag")
     with _thc3:
-        st.caption("Timer")
+        st.caption("Fra")
     with _thc4:
+        st.caption("Til")
+    with _thc5:
+        st.caption("Timer")
+    with _thc6:
         st.caption("Beskrivelse")
 
     for i in range(tl_antall):
-        _tc1, _tc2, _tc3, _tc4 = st.columns([1.2, 1, 0.8, 3])
+        _tc1, _tc2, _tc3, _tc4, _tc5, _tc6 = st.columns([1.2, 1, 0.7, 0.7, 0.5, 3])
         with _tc1:
             st.date_input("Dato", key=f"tl_dato_{i}", label_visibility="collapsed",
                           value=datetime.date.today())
@@ -903,9 +911,20 @@ if st.session_state.get("side") == "timeliste":
             st.text_input("Dag", value=dag_tekst, key=f"tl_dag_{i}",
                           label_visibility="collapsed", disabled=True)
         with _tc3:
-            st.number_input("Timer", min_value=0.0, step=0.5, format="%.1f",
-                            key=f"tl_timer_{i}", label_visibility="collapsed")
+            st.time_input("Fra", key=f"tl_fra_{i}", label_visibility="collapsed",
+                          value=datetime.time(7, 0))
         with _tc4:
+            st.time_input("Til", key=f"tl_til_{i}", label_visibility="collapsed",
+                          value=datetime.time(15, 0))
+        with _tc5:
+            fra_val = st.session_state.get(f"tl_fra_{i}", datetime.time(7, 0))
+            til_val = st.session_state.get(f"tl_til_{i}", datetime.time(15, 0))
+            fra_min = fra_val.hour * 60 + fra_val.minute
+            til_min = til_val.hour * 60 + til_val.minute
+            diff_timer = max((til_min - fra_min) / 60, 0)
+            st.text_input("Timer", value=f"{diff_timer:.1f}", key=f"tl_timer_vis_{i}",
+                          label_visibility="collapsed", disabled=True)
+        with _tc6:
             st.text_input("Beskrivelse", key=f"tl_beskr_{i}", label_visibility="collapsed",
                           placeholder="Beskrivelse av arbeid")
 
@@ -918,7 +937,8 @@ if st.session_state.get("side") == "timeliste":
         if tl_antall > 1:
             if st.button("- Fjern siste", use_container_width=True, key="tl_fjern"):
                 siste = tl_antall - 1
-                for k in [f"tl_dato_{siste}", f"tl_dag_{siste}", f"tl_timer_{siste}", f"tl_beskr_{siste}"]:
+                for k in [f"tl_dato_{siste}", f"tl_dag_{siste}", f"tl_fra_{siste}",
+                           f"tl_til_{siste}", f"tl_timer_vis_{siste}", f"tl_beskr_{siste}"]:
                     if k in st.session_state:
                         del st.session_state[k]
                 st.session_state["tl_antall_rader"] -= 1
@@ -936,12 +956,20 @@ if st.session_state.get("side") == "timeliste":
         else:
             dag_tekst = ""
             dato_str = ""
-        timer_val = st.session_state.get(f"tl_timer_{i}", 0.0)
+        fra_val = st.session_state.get(f"tl_fra_{i}", datetime.time(7, 0))
+        til_val = st.session_state.get(f"tl_til_{i}", datetime.time(15, 0))
+        fra_min = fra_val.hour * 60 + fra_val.minute
+        til_min = til_val.hour * 60 + til_val.minute
+        timer_val = max((til_min - fra_min) / 60, 0)
         beskr_val = st.session_state.get(f"tl_beskr_{i}", "")
+        fra_str = fra_val.strftime("%H:%M")
+        til_str = til_val.strftime("%H:%M")
         sum_timer += timer_val
         tl_rader.append({
             "dag": dag_tekst,
             "dato": dato_str,
+            "fra": fra_str,
+            "til": til_str,
             "timer": timer_val,
             "beskrivelse": beskr_val,
         })
@@ -963,6 +991,7 @@ if st.session_state.get("side") == "timeliste":
     # PDF-eksport
     tl_eksport_data = {
         "prosjektnr": st.session_state.get("tl_prosjektnr", ""),
+        "navn": st.session_state.get("tl_navn", ""),
         "rader": tl_rader,
         "sum_timer": sum_timer,
         "timepris": timepris,
