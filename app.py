@@ -907,8 +907,8 @@ if st.session_state.get("side") == "timeliste":
                 dag_tekst = _DAGNAVN.get(dato_val.weekday(), "")
             else:
                 dag_tekst = ""
-            st.text_input("Dag", value=dag_tekst, key=f"tl_dag_{i}",
-                          disabled=True)
+            st.markdown("**Dag**")
+            st.markdown(dag_tekst)
         with _tc3:
             st.selectbox("Fra", _TIDSVALG, index=_TIDSVALG.index("07:00"),
                          key=f"tl_fra_{i}")
@@ -932,7 +932,7 @@ if st.session_state.get("side") == "timeliste":
         if tl_antall > 1:
             if st.button("- Fjern siste", use_container_width=True, key="tl_fjern"):
                 siste = tl_antall - 1
-                for k in [f"tl_dato_{siste}", f"tl_dag_{siste}", f"tl_fra_{siste}",
+                for k in [f"tl_dato_{siste}", f"tl_fra_{siste}",
                            f"tl_til_{siste}", f"tl_beskr_{siste}"]:
                     if k in st.session_state:
                         del st.session_state[k]
