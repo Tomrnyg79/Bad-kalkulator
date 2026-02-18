@@ -237,6 +237,64 @@ def lagre_kontakter(prosjekt_id, kontakter):
     raise ValueError(f"Prosjekt {prosjekt_id} ikke funnet")
 
 
+# ---------------------------------------------------------------------------
+# Timeliste-utkast per prosjekt (lagret i json_data)
+# ---------------------------------------------------------------------------
+
+
+def hent_timeliste_utkast(prosjekt_id):
+    """Hent timeliste-utkast fra prosjektets json_data. Returnerer dict eller None."""
+    ws = _get_worksheet()
+    alle = ws.get_all_values()
+    for idx, rad in enumerate(alle):
+        if idx == 0:
+            continue
+        if rad[0] == str(prosjekt_id):
+            try:
+                data = json.loads(rad[4]) if rad[4] else {}
+            except (json.JSONDecodeError, IndexError):
+                data = {}
+            return data.get("_timeliste_utkast")
+    return None
+
+
+def lagre_timeliste_utkast(prosjekt_id, utkast_data):
+    """Lagre timeliste-utkast i prosjektets json_data."""
+    ws = _get_worksheet()
+    alle = ws.get_all_values()
+    for idx, rad in enumerate(alle):
+        if idx == 0:
+            continue
+        if rad[0] == str(prosjekt_id):
+            try:
+                data = json.loads(rad[4]) if rad[4] else {}
+            except (json.JSONDecodeError, IndexError):
+                data = {}
+            data["_timeliste_utkast"] = utkast_data
+            ws.update_cell(idx + 1, 5, json.dumps(data, ensure_ascii=False))
+            _tøm_prosjekt_cache()
+            return
+    raise ValueError(f"Prosjekt {prosjekt_id} ikke funnet")
+
+
+def slett_timeliste_utkast(prosjekt_id):
+    """Slett timeliste-utkast fra prosjektets json_data."""
+    ws = _get_worksheet()
+    alle = ws.get_all_values()
+    for idx, rad in enumerate(alle):
+        if idx == 0:
+            continue
+        if rad[0] == str(prosjekt_id):
+            try:
+                data = json.loads(rad[4]) if rad[4] else {}
+            except (json.JSONDecodeError, IndexError):
+                data = {}
+            data.pop("_timeliste_utkast", None)
+            ws.update_cell(idx + 1, 5, json.dumps(data, ensure_ascii=False))
+            _tøm_prosjekt_cache()
+            return
+
+
 def oppdater_prosjekt_status(prosjekt_id, status, kontraktspris=None):
     """Oppdater _status (og eventuelt _kontraktspris) i prosjektets json_data."""
     ws = _get_worksheet()

@@ -11,7 +11,8 @@ from prosjekter import (lagre_prosjekt, oppdater_prosjekt, hent_alle_prosjekter,
                          lagre_dokument, hent_dokumenter,
                          last_ned_dokument, slett_dokument, endre_dokumentnavn,
                          imap_er_konfigurert, sjekk_epost,
-                         oppdater_prosjekt_status)
+                         oppdater_prosjekt_status,
+                         hent_timeliste_utkast, lagre_timeliste_utkast, slett_timeliste_utkast)
 
 st.set_page_config(page_title="Baderoms kalkyle | Nygård Bad", page_icon="🛁", layout="centered")
 
@@ -866,6 +867,28 @@ if st.session_state.get("side") == "manuell_kalkyle":
 # TIMELISTE (side == "timeliste")
 # ===================================================================
 if st.session_state.get("side") == "timeliste":
+    # Last inn utkast fra prosjekt hvis det finnes (kun ved første åpning)
+    _tl_pid = st.session_state.get("prosjekt_id", "")
+    if _tl_pid and not st.session_state.get("_tl_utkast_lastet"):
+        try:
+            _utkast = hent_timeliste_utkast(_tl_pid)
+            if _utkast:
+                # Gjenopprett alle tl_-verdier fra utkastet
+                for _uk, _uv in _utkast.items():
+                    if _uk.startswith("tl_"):
+                        # Konverter datostrenger tilbake til date-objekter
+                        if "_dato_" in _uk and isinstance(_uv, str) and len(_uv) == 10:
+                            try:
+                                _uv = datetime.datetime.strptime(_uv, "%Y-%m-%d").date()
+                            except ValueError:
+                                pass
+                        st.session_state[_uk] = _uv
+                st.session_state["_tl_utkast_lastet"] = True
+                st.rerun()
+        except Exception:
+            pass
+        st.session_state["_tl_utkast_lastet"] = True
+
     if _logo.exists():
         col1, col2, col3 = st.columns([1, 1, 1])
         with col2:
@@ -1074,14 +1097,44 @@ if st.session_state.get("side") == "timeliste":
         f"{tl_filnavn}.pdf", "application/pdf", use_container_width=True,
     )
 
+    # Samle alle tl_-verdier for utkastlagring
+    def _samle_tl_data():
+        utkast = {}
+        for _k, _v in st.session_state.items():
+            if _k.startswith("tl_"):
+                if isinstance(_v, datetime.date):
+                    utkast[_k] = _v.strftime("%Y-%m-%d")
+                else:
+                    try:
+                        json.dumps(_v)
+                        utkast[_k] = _v
+                    except (TypeError, ValueError):
+                        utkast[_k] = str(_v)
+        return utkast
+
     # Lagre til prosjekt hvis åpnet fra et oppdrag
     tl_prosjekt_id = st.session_state.get("prosjekt_id", "")
     if tl_prosjekt_id and sheets_er_konfigurert():
+        st.divider()
+
+        # Lagre utkast (uten å lukke)
+        if st.button("Lagre utkast", use_container_width=True, key="tl_lagre_utkast"):
+            try:
+                lagre_timeliste_utkast(tl_prosjekt_id, _samle_tl_data())
+                st.success("Utkast lagret! Du kan fortsette senere.")
+            except Exception as e:
+                st.error(f"Kunne ikke lagre utkast: {e}")
+
         st.divider()
         if st.button("Lukk og lagre", use_container_width=True, type="primary", key="tl_lagre"):
             try:
                 dok_navn = f"Timeliste {datetime.date.today().strftime('%d.%m.%Y')}"
                 lagre_dokument(tl_prosjekt_id, dok_navn, tl_pdf_bytes)
+                # Slett utkast etter ferdigstillelse
+                try:
+                    slett_timeliste_utkast(tl_prosjekt_id)
+                except Exception:
+                    pass
                 st.success(f"Timeliste lagret under dokumenter for {st.session_state.get('dok_prosjekt_adresse', '')}!")
                 st.session_state["tl_lagret"] = True
                 st.rerun()
@@ -1128,6 +1181,12 @@ if st.session_state.get("side") == "timeliste":
 
     st.divider()
     if st.button("← Tilbake til hjem", use_container_width=False, key="tl_tilbake"):
+        # Auto-lagre utkast hvis knyttet til prosjekt
+        if tl_prosjekt_id and sheets_er_konfigurert():
+            try:
+                lagre_timeliste_utkast(tl_prosjekt_id, _samle_tl_data())
+            except Exception:
+                pass
         st.session_state["side"] = "hjem"
         st.rerun()
 
