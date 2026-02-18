@@ -895,24 +895,11 @@ if st.session_state.get("side") == "timeliste":
 
     tl_antall = st.session_state["tl_antall_rader"]
 
-    _thc1, _thc2, _thc3, _thc4, _thc5, _thc6 = st.columns([1.2, 1, 0.7, 0.7, 0.5, 3])
-    with _thc1:
-        st.caption("Dato")
-    with _thc2:
-        st.caption("Dag")
-    with _thc3:
-        st.caption("Fra")
-    with _thc4:
-        st.caption("Til")
-    with _thc5:
-        st.caption("Timer")
-    with _thc6:
-        st.caption("Beskrivelse")
-
     for i in range(tl_antall):
-        _tc1, _tc2, _tc3, _tc4, _tc5, _tc6 = st.columns([1.2, 1, 0.7, 0.7, 0.5, 3])
+        st.markdown(f"**Rad {i + 1}**")
+        _tc1, _tc2, _tc3, _tc4 = st.columns([1.5, 1, 1, 1])
         with _tc1:
-            st.date_input("Dato", key=f"tl_dato_{i}", label_visibility="collapsed",
+            st.date_input("Dato", key=f"tl_dato_{i}", label_visibility="visible",
                           value=datetime.date.today())
         with _tc2:
             dato_val = st.session_state.get(f"tl_dato_{i}", datetime.date.today())
@@ -921,22 +908,20 @@ if st.session_state.get("side") == "timeliste":
             else:
                 dag_tekst = ""
             st.text_input("Dag", value=dag_tekst, key=f"tl_dag_{i}",
-                          label_visibility="collapsed", disabled=True)
+                          disabled=True)
         with _tc3:
             st.selectbox("Fra", _TIDSVALG, index=_TIDSVALG.index("07:00"),
-                         key=f"tl_fra_{i}", label_visibility="collapsed")
+                         key=f"tl_fra_{i}")
         with _tc4:
             st.selectbox("Til", _TIDSVALG, index=_TIDSVALG.index("15:00"),
-                         key=f"tl_til_{i}", label_visibility="collapsed")
-        with _tc5:
-            fra_str = st.session_state.get(f"tl_fra_{i}", "07:00")
-            til_str = st.session_state.get(f"tl_til_{i}", "15:00")
-            diff_timer = max((_tid_til_min(til_str) - _tid_til_min(fra_str)) / 60, 0)
-            st.text_input("Timer", value=f"{diff_timer:.1f}", key=f"tl_timer_vis_{i}",
-                          label_visibility="collapsed", disabled=True)
-        with _tc6:
-            st.text_input("Beskrivelse", key=f"tl_beskr_{i}", label_visibility="collapsed",
-                          placeholder="Beskrivelse av arbeid")
+                         key=f"tl_til_{i}")
+        fra_str = st.session_state.get(f"tl_fra_{i}", "07:00")
+        til_str = st.session_state.get(f"tl_til_{i}", "15:00")
+        diff_timer = max((_tid_til_min(til_str) - _tid_til_min(fra_str)) / 60, 0)
+        st.text_input("Beskrivelse", key=f"tl_beskr_{i}",
+                      placeholder="Beskrivelse av arbeid")
+        st.caption(f"Timer: {diff_timer:.1f}")
+        st.divider()
 
     _tb1, _tb2, _ = st.columns([1, 1, 2])
     with _tb1:
@@ -948,7 +933,7 @@ if st.session_state.get("side") == "timeliste":
             if st.button("- Fjern siste", use_container_width=True, key="tl_fjern"):
                 siste = tl_antall - 1
                 for k in [f"tl_dato_{siste}", f"tl_dag_{siste}", f"tl_fra_{siste}",
-                           f"tl_til_{siste}", f"tl_timer_vis_{siste}", f"tl_beskr_{siste}"]:
+                           f"tl_til_{siste}", f"tl_beskr_{siste}"]:
                     if k in st.session_state:
                         del st.session_state[k]
                 st.session_state["tl_antall_rader"] -= 1
