@@ -591,6 +591,7 @@ def generer_timeliste_pdf(data):
     felter = [
         ("Prosjektnr:", data.get("prosjektnr", "")),
         ("Kunde:", data.get("kunde", "")),
+        ("Kontakt:", data.get("kontakt", "")),
         ("Adresse:", data.get("adresse", "")),
         ("Navn:", data.get("navn", "")),
         ("Periode:", datoperiode),

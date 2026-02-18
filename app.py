@@ -873,10 +873,12 @@ if st.session_state.get("side") == "timeliste":
         st.text_input("Prosjektnummer", placeholder="F.eks. 2024-001", key="tl_prosjektnr")
     with _tl_info2:
         st.text_input("Navn (ansatt)", placeholder="Navn på person", key="tl_navn")
-    _tl_info3, _tl_info4 = st.columns(2)
+    _tl_info3, _tl_info4, _tl_info5 = st.columns(3)
     with _tl_info3:
         st.text_input("Kunde", placeholder="Kundens navn", key="tl_kunde")
     with _tl_info4:
+        st.text_input("Kontaktperson", placeholder="Kontaktperson hos kunde", key="tl_kontakt")
+    with _tl_info5:
         st.text_input("Adresse", placeholder="Prosjektadresse", key="tl_adresse")
 
     st.divider()
@@ -984,6 +986,7 @@ if st.session_state.get("side") == "timeliste":
         "prosjektnr": st.session_state.get("tl_prosjektnr", ""),
         "navn": st.session_state.get("tl_navn", ""),
         "kunde": st.session_state.get("tl_kunde", ""),
+        "kontakt": st.session_state.get("tl_kontakt", ""),
         "adresse": st.session_state.get("tl_adresse", ""),
         "rader": tl_rader,
         "sum_timer": sum_timer,
