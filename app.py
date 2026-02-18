@@ -882,6 +882,13 @@ if st.session_state.get("side") == "timeliste":
     st.divider()
     st.subheader("Timeregistrering")
 
+    # Tidsvalg i halvtimes-intervaller
+    _TIDSVALG = [f"{h:02d}:{m:02d}" for h in range(24) for m in (0, 30)]
+
+    def _tid_til_min(tid_str):
+        h, m = tid_str.split(":")
+        return int(h) * 60 + int(m)
+
     # Dynamiske rader
     if "tl_antall_rader" not in st.session_state:
         st.session_state["tl_antall_rader"] = 1
@@ -916,17 +923,15 @@ if st.session_state.get("side") == "timeliste":
             st.text_input("Dag", value=dag_tekst, key=f"tl_dag_{i}",
                           label_visibility="collapsed", disabled=True)
         with _tc3:
-            st.time_input("Fra", key=f"tl_fra_{i}", label_visibility="collapsed",
-                          value=datetime.time(7, 0))
+            st.selectbox("Fra", _TIDSVALG, index=_TIDSVALG.index("07:00"),
+                         key=f"tl_fra_{i}", label_visibility="collapsed")
         with _tc4:
-            st.time_input("Til", key=f"tl_til_{i}", label_visibility="collapsed",
-                          value=datetime.time(15, 0))
+            st.selectbox("Til", _TIDSVALG, index=_TIDSVALG.index("15:00"),
+                         key=f"tl_til_{i}", label_visibility="collapsed")
         with _tc5:
-            fra_val = st.session_state.get(f"tl_fra_{i}", datetime.time(7, 0))
-            til_val = st.session_state.get(f"tl_til_{i}", datetime.time(15, 0))
-            fra_min = fra_val.hour * 60 + fra_val.minute
-            til_min = til_val.hour * 60 + til_val.minute
-            diff_timer = max((til_min - fra_min) / 60, 0)
+            fra_str = st.session_state.get(f"tl_fra_{i}", "07:00")
+            til_str = st.session_state.get(f"tl_til_{i}", "15:00")
+            diff_timer = max((_tid_til_min(til_str) - _tid_til_min(fra_str)) / 60, 0)
             st.text_input("Timer", value=f"{diff_timer:.1f}", key=f"tl_timer_vis_{i}",
                           label_visibility="collapsed", disabled=True)
         with _tc6:
@@ -961,14 +966,10 @@ if st.session_state.get("side") == "timeliste":
         else:
             dag_tekst = ""
             dato_str = ""
-        fra_val = st.session_state.get(f"tl_fra_{i}", datetime.time(7, 0))
-        til_val = st.session_state.get(f"tl_til_{i}", datetime.time(15, 0))
-        fra_min = fra_val.hour * 60 + fra_val.minute
-        til_min = til_val.hour * 60 + til_val.minute
-        timer_val = max((til_min - fra_min) / 60, 0)
+        fra_str = st.session_state.get(f"tl_fra_{i}", "07:00")
+        til_str = st.session_state.get(f"tl_til_{i}", "15:00")
+        timer_val = max((_tid_til_min(til_str) - _tid_til_min(fra_str)) / 60, 0)
         beskr_val = st.session_state.get(f"tl_beskr_{i}", "")
-        fra_str = fra_val.strftime("%H:%M")
-        til_str = til_val.strftime("%H:%M")
         sum_timer += timer_val
         tl_rader.append({
             "dag": dag_tekst,
