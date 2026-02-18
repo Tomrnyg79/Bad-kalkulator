@@ -590,6 +590,8 @@ def generer_timeliste_pdf(data):
 
     felter = [
         ("Prosjektnr:", data.get("prosjektnr", "")),
+        ("Kunde:", data.get("kunde", "")),
+        ("Adresse:", data.get("adresse", "")),
         ("Navn:", data.get("navn", "")),
         ("Periode:", datoperiode),
         ("Timepris:", f"{fmt(TOMRER['timepris'])} kr/t eks. mva"),

@@ -867,12 +867,17 @@ if st.session_state.get("side") == "timeliste":
     _DAGNAVN = {0: "Mandag", 1: "Tirsdag", 2: "Onsdag", 3: "Torsdag",
                 4: "Fredag", 5: "Lørdag", 6: "Søndag"}
 
-    # Prosjektnummer og navn
+    # Prosjektinfo
     _tl_info1, _tl_info2 = st.columns(2)
     with _tl_info1:
         st.text_input("Prosjektnummer", placeholder="F.eks. 2024-001", key="tl_prosjektnr")
     with _tl_info2:
-        st.text_input("Navn", placeholder="Navn på person", key="tl_navn")
+        st.text_input("Navn (ansatt)", placeholder="Navn på person", key="tl_navn")
+    _tl_info3, _tl_info4 = st.columns(2)
+    with _tl_info3:
+        st.text_input("Kunde", placeholder="Kundens navn", key="tl_kunde")
+    with _tl_info4:
+        st.text_input("Adresse", placeholder="Prosjektadresse", key="tl_adresse")
 
     st.divider()
     st.subheader("Timeregistrering")
@@ -992,6 +997,8 @@ if st.session_state.get("side") == "timeliste":
     tl_eksport_data = {
         "prosjektnr": st.session_state.get("tl_prosjektnr", ""),
         "navn": st.session_state.get("tl_navn", ""),
+        "kunde": st.session_state.get("tl_kunde", ""),
+        "adresse": st.session_state.get("tl_adresse", ""),
         "rader": tl_rader,
         "sum_timer": sum_timer,
         "timepris": timepris,
