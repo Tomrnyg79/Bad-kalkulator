@@ -1083,10 +1083,48 @@ if st.session_state.get("side") == "timeliste":
                 dok_navn = f"Timeliste {datetime.date.today().strftime('%d.%m.%Y')}"
                 lagre_dokument(tl_prosjekt_id, dok_navn, tl_pdf_bytes)
                 st.success(f"Timeliste lagret under dokumenter for {st.session_state.get('dok_prosjekt_adresse', '')}!")
-                st.session_state["side"] = "hjem"
+                st.session_state["tl_lagret"] = True
                 st.rerun()
             except Exception as e:
                 st.error(f"Kunne ikke lagre: {e}")
+
+        # Spørsmål om e-post etter lagring
+        if st.session_state.get("tl_lagret"):
+            st.divider()
+            st.markdown("**Skal timelisten sendes til Tom for fakturering?**")
+            _tl_ja, _tl_nei = st.columns(2)
+            with _tl_ja:
+                if st.button("Ja, send til Tom", use_container_width=True, type="primary", key="tl_send_ja"):
+                    try:
+                        smtp_config = {
+                            "host": st.secrets["smtp"]["host"],
+                            "port": int(st.secrets["smtp"]["port"]),
+                            "bruker": st.secrets["smtp"]["bruker"],
+                            "passord": st.secrets["smtp"]["passord"],
+                        }
+                        adr = st.session_state.get("dok_prosjekt_adresse", "")
+                        emne = f"Timeliste – {adr}" if adr else "Timeliste"
+                        brodtekst = (
+                            f"Hei,\n\n"
+                            f"Vedlagt timeliste for fakturering.\n"
+                            f"Prosjekt: {adr}\n"
+                            f"Sum timer: {total_sum_timer:.1f}\n"
+                            f"Total inkl. mva: {fmt(total_inkl)} kr\n\n"
+                            f"Med vennlig hilsen\n{FIRMA['navn']}"
+                        )
+                        vedlegg = [(f"{tl_filnavn}.pdf", tl_pdf_bytes, "application/pdf")]
+                        send_epost("tom@nygardbad.no", emne, brodtekst, vedlegg, smtp_config)
+                        st.success("Timeliste sendt til Tom!")
+                        del st.session_state["tl_lagret"]
+                        st.session_state["side"] = "hjem"
+                        st.rerun()
+                    except Exception as e:
+                        st.error(f"Kunne ikke sende e-post: {e}")
+            with _tl_nei:
+                if st.button("Nei", use_container_width=True, key="tl_send_nei"):
+                    del st.session_state["tl_lagret"]
+                    st.session_state["side"] = "hjem"
+                    st.rerun()
 
     st.divider()
     if st.button("← Tilbake til hjem", use_container_width=False, key="tl_tilbake"):
