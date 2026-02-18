@@ -495,7 +495,7 @@ if st.session_state.get("side", "hjem") == "hjem":
                 kontraktspris = _hent_kontraktspris(proj)
                 pris_tekst = f" – Avtalt: {fmt(kontraktspris)} kr" if kontraktspris else ""
                 st.markdown(f"**{adr}**  \n{dato} – {bruker}{pris_tekst}")
-                btn_a, btn_d, btn_k, btn_s = st.columns(4)
+                btn_a, btn_d, btn_k, btn_t, btn_s = st.columns(5)
                 with btn_a:
                     if st.button("Åpne kalkyle", key=f"o_open_{idx}", use_container_width=True):
                         last_prosjekt(proj)
@@ -515,6 +515,17 @@ if st.session_state.get("side", "hjem") == "hjem":
                         st.session_state["prosjekt_id"] = proj.get("id", "")
                         st.session_state["dok_prosjekt_adresse"] = adr
                         st.session_state["side"] = "kontakter"
+                        st.rerun()
+                with btn_t:
+                    if st.button("Timeliste", key=f"o_time_{idx}", use_container_width=True):
+                        # Rydd tl_-nøkler
+                        for nk in list(st.session_state.keys()):
+                            if nk.startswith("tl_"):
+                                del st.session_state[nk]
+                        st.session_state["prosjekt_id"] = proj.get("id", "")
+                        st.session_state["dok_prosjekt_adresse"] = adr
+                        st.session_state["tl_adresse"] = adr
+                        st.session_state["side"] = "timeliste"
                         st.rerun()
                 with btn_s:
                     bekreft_key = f"bekreft_slett_o_{idx}"
@@ -1056,10 +1067,26 @@ if st.session_state.get("side") == "timeliste":
     st.divider()
     prosjektnr_fil = trygt_filnavn(st.session_state.get("tl_prosjektnr", "timeliste"))
     tl_filnavn = f"timeliste_{prosjektnr_fil}_{datetime.date.today()}"
+    tl_pdf_bytes = generer_timeliste_pdf(tl_eksport_data)
+
     st.download_button(
-        "Last ned PDF", generer_timeliste_pdf(tl_eksport_data),
+        "Last ned PDF", tl_pdf_bytes,
         f"{tl_filnavn}.pdf", "application/pdf", use_container_width=True,
     )
+
+    # Lagre til prosjekt hvis åpnet fra et oppdrag
+    tl_prosjekt_id = st.session_state.get("prosjekt_id", "")
+    if tl_prosjekt_id and sheets_er_konfigurert():
+        st.divider()
+        if st.button("Lukk og lagre", use_container_width=True, type="primary", key="tl_lagre"):
+            try:
+                dok_navn = f"Timeliste {datetime.date.today().strftime('%d.%m.%Y')}"
+                lagre_dokument(tl_prosjekt_id, dok_navn, tl_pdf_bytes)
+                st.success(f"Timeliste lagret under dokumenter for {st.session_state.get('dok_prosjekt_adresse', '')}!")
+                st.session_state["side"] = "hjem"
+                st.rerun()
+            except Exception as e:
+                st.error(f"Kunne ikke lagre: {e}")
 
     st.divider()
     if st.button("← Tilbake til hjem", use_container_width=False, key="tl_tilbake"):
