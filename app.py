@@ -928,11 +928,12 @@ if st.session_state.get("side") == "timeliste":
         person_rader = []
 
         for i in range(antall_rader):
+            if f"tl_dato_{p}_{i}" not in st.session_state:
+                st.session_state[f"tl_dato_{p}_{i}"] = datetime.date.today()
             st.markdown(f"**Rad {i + 1}**")
             _tc1, _tc2, _tc3, _tc4 = st.columns([1.5, 1, 1, 1])
             with _tc1:
-                st.date_input("Dato", key=f"tl_dato_{p}_{i}", label_visibility="visible",
-                              value=datetime.date.today())
+                st.date_input("Dato", key=f"tl_dato_{p}_{i}", label_visibility="visible")
             with _tc2:
                 dato_val = st.session_state.get(f"tl_dato_{p}_{i}", datetime.date.today())
                 if isinstance(dato_val, datetime.date):
@@ -942,11 +943,13 @@ if st.session_state.get("side") == "timeliste":
                 st.markdown("**Dag**")
                 st.markdown(dag_tekst)
             with _tc3:
-                st.selectbox("Fra", _TIDSVALG, index=_TIDSVALG.index("07:00"),
-                             key=f"tl_fra_{p}_{i}")
+                if f"tl_fra_{p}_{i}" not in st.session_state:
+                    st.session_state[f"tl_fra_{p}_{i}"] = "07:00"
+                st.selectbox("Fra", _TIDSVALG, key=f"tl_fra_{p}_{i}")
             with _tc4:
-                st.selectbox("Til", _TIDSVALG, index=_TIDSVALG.index("15:00"),
-                             key=f"tl_til_{p}_{i}")
+                if f"tl_til_{p}_{i}" not in st.session_state:
+                    st.session_state[f"tl_til_{p}_{i}"] = "15:00"
+                st.selectbox("Til", _TIDSVALG, key=f"tl_til_{p}_{i}")
             fra_str = st.session_state.get(f"tl_fra_{p}_{i}", "07:00")
             til_str = st.session_state.get(f"tl_til_{p}_{i}", "15:00")
             diff_timer = max((_tid_til_min(til_str) - _tid_til_min(fra_str)) / 60, 0)
