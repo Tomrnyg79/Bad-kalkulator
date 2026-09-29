@@ -956,6 +956,9 @@ if st.session_state.get("side") == "rammepris_kalkyle":
                 "pris": int(st.session_state.get(f"rp_tv_pris_{i}", 0)),
             })
 
+    st.divider()
+    st.info("Oppretting av vegger, forsterking av gulv eller andre tillegg utføres på timer til 825,- kr eks. mva.")
+
     # Beregninger
     tilvalg_sum = sum(tv["pris"] for tv in valgte_tilvalg)
     subtotal = pris_eks + tilvalg_sum

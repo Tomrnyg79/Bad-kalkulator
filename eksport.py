@@ -270,6 +270,13 @@ def generer_rammepris_pdf(data):
             skravur = not skravur
         pdf.ln(4)
 
+    # Merknad timepris
+    pdf.set_font("Helvetica", "I", 9)
+    pdf.set_text_color(80, 80, 80)
+    pdf.multi_cell(0, 5, "Oppretting av vegger, forsterking av gulv eller andre tillegg utfores pa timer til 825,- kr eks. mva.")
+    pdf.set_text_color(0, 0, 0)
+    pdf.ln(4)
+
     # Totaler
     rammepris_eks = data.get("rammepris_eks", data.get("subtotal", 0))
     tilvalg_sum = sum(tv["pris"] for tv in tilvalg)
