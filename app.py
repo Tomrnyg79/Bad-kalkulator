@@ -957,7 +957,11 @@ if st.session_state.get("side") == "rammepris_kalkyle":
             })
 
     st.divider()
-    st.info("Oppretting av vegger, forsterking av gulv eller andre tillegg utføres på timer til 825,- kr eks. mva.")
+    st.info(
+        "Oppretting av vegger, forsterking av gulv eller andre tillegg utføres på timer til 825,- kr eks. mva.\n\n"
+        "Materialer og forbruksmateriell er ikke inkludert i prisen. "
+        "Parkering og andre utlegg som må betales på stedet kommer som tillegg til prisene."
+    )
 
     # Beregninger
     tilvalg_sum = sum(tv["pris"] for tv in valgte_tilvalg)
