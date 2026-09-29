@@ -963,18 +963,14 @@ if st.session_state.get("side") == "rammepris_kalkyle":
         "Parkering og andre utlegg som må betales på stedet kommer som tillegg til prisene."
     )
 
-    # Beregninger
-    tilvalg_sum = sum(tv["pris"] for tv in valgte_tilvalg)
-    subtotal = pris_eks + tilvalg_sum
+    # Beregninger – tilvalg er IKKE med i totalen
+    subtotal = pris_eks
     mva = round(subtotal * MVA_SATS)
     total_inkl = subtotal + mva
 
     st.divider()
     _, _rp_total_kol = st.columns([2, 2])
     with _rp_total_kol:
-        st.markdown(f"**Rammepris eks. mva:** {fmt(pris_eks)} kr")
-        if tilvalg_sum > 0:
-            st.markdown(f"**Tilvalg eks. mva:** {fmt(tilvalg_sum)} kr")
         st.markdown(f"**Sum eks. mva:** {fmt(subtotal)} kr")
         st.markdown(f"**MVA 25%:** {fmt(mva)} kr")
         st.markdown(f"### Total inkl. mva: {fmt(total_inkl)} kr")
