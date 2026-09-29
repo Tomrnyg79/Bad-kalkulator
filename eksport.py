@@ -276,6 +276,8 @@ def generer_rammepris_pdf(data):
     pdf.multi_cell(0, 5, "Oppretting av vegger, forsterking av gulv eller andre tillegg utfores pa timer til 825,- kr eks. mva.")
     pdf.ln(2)
     pdf.multi_cell(0, 5, "Materialer og forbruksmateriell er ikke inkludert i prisen. Parkering og andre utlegg som ma betales pa stedet kommer som tillegg til prisene.")
+    pdf.ln(2)
+    pdf.multi_cell(0, 5, "Dersom badet er i 3. etasje eller hoyere og det ikke finnes heis, ma pris avtales i hvert enkelt tilfelle.")
     pdf.set_text_color(0, 0, 0)
     pdf.ln(4)
 

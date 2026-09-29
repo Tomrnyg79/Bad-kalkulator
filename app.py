@@ -960,7 +960,8 @@ if st.session_state.get("side") == "rammepris_kalkyle":
     st.info(
         "Oppretting av vegger, forsterking av gulv eller andre tillegg utføres på timer til 825,- kr eks. mva.\n\n"
         "Materialer og forbruksmateriell er ikke inkludert i prisen. "
-        "Parkering og andre utlegg som må betales på stedet kommer som tillegg til prisene."
+        "Parkering og andre utlegg som må betales på stedet kommer som tillegg til prisene.\n\n"
+        "Dersom badet er i 3. etasje eller høyere og det ikke finnes heis, må pris avtales i hvert enkelt tilfelle."
     )
 
     # Beregninger – tilvalg er IKKE med i totalen
