@@ -74,6 +74,7 @@ RAMMEPRIS = {
         {"navn": "Utvendige hjørner med list", "pris_eks_mva": 0},
         {"navn": "Utvendige hjørner med gjæring", "pris_eks_mva": 0},
         {"navn": "Nisjer", "pris_eks_mva": 0},
+        {"navn": "Fuging med epoxy", "pris_eks_mva": 0},
     ],
 }
 
