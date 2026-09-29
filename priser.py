@@ -55,7 +55,7 @@ RAMMEPRIS = {
         "Membran vegg",
         "Flislegging gulv",
         "Flislegging vegg",
-        "Flislegging dusjgulv",
+        "Flislegging dusjgulv med nedsenk",
         "Tillegg ekstra sluk",
         "Hjørnelist utv. hjørner",
         "Silikonering",
