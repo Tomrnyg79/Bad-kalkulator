@@ -67,6 +67,8 @@ RAMMEPRIS = {
         "Kun nye lister",
         "Ekstra innv. hjørner",
         "Maling og sparkling av gipstak",
+        "Ny dør inkl. utforing og listing",
+        "Bygging og flislegging av cisternekasse",
     ],
     "tilvalg": [
         {"navn": "Utvendige hjørner med list", "pris_eks_mva": 0},
