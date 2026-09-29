@@ -65,8 +65,13 @@ RAMMEPRIS = {
         "Nedforing / lekting tak",
         "Gips tak",
         "Kun nye lister",
-        "Utvendige hjørner",
         "Ekstra innv. hjørner",
+        "Maling og sparkling av gipstak",
+    ],
+    "tilvalg": [
+        {"navn": "Utvendige hjørner med list", "pris_eks_mva": 0},
+        {"navn": "Utvendige hjørner med gjæring", "pris_eks_mva": 0},
+        {"navn": "Nisjer", "pris_eks_mva": 0},
     ],
 }
 

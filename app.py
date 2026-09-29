@@ -930,15 +930,45 @@ if st.session_state.get("side") == "rammepris_kalkyle":
         if st.session_state.get(f"rp_inkl_{i}", False):
             valgte_poster.append(valg)
 
+    # Tilvalg
+    st.divider()
+    st.subheader("Tilvalg")
+    st.caption("Huk av tilvalg og legg inn fast pris eks. mva – vises som egne poster på PDF-en.")
+
+    tilvalg_def = RAMMEPRIS["tilvalg"]
+    valgte_tilvalg = []
+    for i, tv in enumerate(tilvalg_def):
+        _tv_k1, _tv_k2 = st.columns([2, 1])
+        with _tv_k1:
+            st.checkbox(tv["navn"], key=f"rp_tv_{i}")
+        with _tv_k2:
+            st.number_input(
+                "Pris eks. mva (kr)",
+                min_value=0,
+                value=int(st.session_state.get(f"_rp_tv_pris_{i}", tv["pris_eks_mva"])),
+                step=500,
+                key=f"rp_tv_pris_{i}",
+                label_visibility="collapsed",
+            )
+        if st.session_state.get(f"rp_tv_{i}", False):
+            valgte_tilvalg.append({
+                "navn": tv["navn"],
+                "pris": int(st.session_state.get(f"rp_tv_pris_{i}", 0)),
+            })
+
     # Beregninger
-    subtotal = pris_eks
+    tilvalg_sum = sum(tv["pris"] for tv in valgte_tilvalg)
+    subtotal = pris_eks + tilvalg_sum
     mva = round(subtotal * MVA_SATS)
     total_inkl = subtotal + mva
 
     st.divider()
     _, _rp_total_kol = st.columns([2, 2])
     with _rp_total_kol:
-        st.markdown(f"**Rammepris eks. mva:** {fmt(subtotal)} kr")
+        st.markdown(f"**Rammepris eks. mva:** {fmt(pris_eks)} kr")
+        if tilvalg_sum > 0:
+            st.markdown(f"**Tilvalg eks. mva:** {fmt(tilvalg_sum)} kr")
+        st.markdown(f"**Sum eks. mva:** {fmt(subtotal)} kr")
         st.markdown(f"**MVA 25%:** {fmt(mva)} kr")
         st.markdown(f"### Total inkl. mva: {fmt(total_inkl)} kr")
 
@@ -949,6 +979,9 @@ if st.session_state.get("side") == "rammepris_kalkyle":
     st.session_state["_rp_pris_eks"] = pris_eks
     for i in range(len(inkludert_valg)):
         st.session_state[f"_rp_inkl_{i}"] = st.session_state.get(f"rp_inkl_{i}", False)
+    for i in range(len(tilvalg_def)):
+        st.session_state[f"_rp_tv_{i}"] = st.session_state.get(f"rp_tv_{i}", False)
+        st.session_state[f"_rp_tv_pris_{i}"] = st.session_state.get(f"rp_tv_pris_{i}", 0)
 
     dato = datetime.date.today().strftime("%d.%m.%Y")
     rp_eksport_data = {
@@ -957,6 +990,8 @@ if st.session_state.get("side") == "rammepris_kalkyle":
         "dato": dato,
         "rp_kategori": kategori,
         "inkludert": valgte_poster,
+        "tilvalg": valgte_tilvalg,
+        "rammepris_eks": pris_eks,
         "subtotal": subtotal,
         "mva": mva,
         "total_inkl": total_inkl,

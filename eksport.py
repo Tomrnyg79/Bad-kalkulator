@@ -244,7 +244,35 @@ def generer_rammepris_pdf(data):
             pdf.cell(0, 6, post, new_x="LMARGIN", new_y="NEXT")
         pdf.ln(6)
 
+    # Tilvalg
+    tilvalg = data.get("tilvalg", [])
+    if tilvalg:
+        pdf.set_font("Helvetica", "B", 12)
+        pdf.cell(0, 8, "Tilvalg:", new_x="LMARGIN", new_y="NEXT")
+        pdf.ln(2)
+
+        kol_b = [120, 70]
+        pdf.set_font("Helvetica", "B", 9)
+        pdf.set_fill_color(50, 50, 50)
+        pdf.set_text_color(255, 255, 255)
+        pdf.cell(kol_b[0], 7, "Post", border=1, fill=True)
+        pdf.cell(kol_b[1], 7, "Fast pris eks. mva", border=1, fill=True, align="R")
+        pdf.ln()
+
+        pdf.set_text_color(0, 0, 0)
+        pdf.set_font("Helvetica", "", 10)
+        skravur = False
+        for tv in tilvalg:
+            pdf.set_fill_color(245, 245, 245) if skravur else pdf.set_fill_color(255, 255, 255)
+            pdf.cell(kol_b[0], 7, tv["navn"], border=1, fill=True)
+            pdf.cell(kol_b[1], 7, f"{fmt(tv['pris'])} kr", border=1, fill=True, align="R")
+            pdf.ln()
+            skravur = not skravur
+        pdf.ln(4)
+
     # Totaler
+    rammepris_eks = data.get("rammepris_eks", data.get("subtotal", 0))
+    tilvalg_sum = sum(tv["pris"] for tv in tilvalg)
     subtotal = data.get("subtotal", 0)
     mva = data.get("mva", 0)
     total_inkl = data.get("total_inkl", 0)
@@ -258,6 +286,17 @@ def generer_rammepris_pdf(data):
     pdf.ln(4)
 
     pdf.set_font("Helvetica", "", 11)
+    pdf.set_x(left)
+    pdf.cell(label_w, 7, "Rammepris eks. mva:", align="R")
+    pdf.cell(val_w, 7, f"{fmt(rammepris_eks)} kr", align="R")
+    pdf.ln()
+
+    if tilvalg_sum > 0:
+        pdf.set_x(left)
+        pdf.cell(label_w, 7, "Tilvalg eks. mva:", align="R")
+        pdf.cell(val_w, 7, f"{fmt(tilvalg_sum)} kr", align="R")
+        pdf.ln()
+
     pdf.set_x(left)
     pdf.cell(label_w, 7, "Sum eks. mva:", align="R")
     pdf.cell(val_w, 7, f"{fmt(subtotal)} kr", align="R")
