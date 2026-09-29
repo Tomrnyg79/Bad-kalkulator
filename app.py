@@ -3,8 +3,8 @@ import streamlit as st
 import datetime
 import re
 
-from priser import FIRMA, MVA_SATS, FLIS, TOMRER, EPOXY_VALG
-from eksport import generer_pdf, generer_excel, send_epost, generer_tekst_dokument_pdf, generer_bilde_dokument_pdf, generer_kontaktliste_pdf, generer_timeliste_pdf
+from priser import FIRMA, MVA_SATS, FLIS, TOMRER, EPOXY_VALG, RAMMEPRIS
+from eksport import generer_pdf, generer_excel, send_epost, generer_tekst_dokument_pdf, generer_bilde_dokument_pdf, generer_kontaktliste_pdf, generer_timeliste_pdf, generer_rammepris_pdf
 from prosjekter import (lagre_prosjekt, oppdater_prosjekt, hent_alle_prosjekter, last_prosjekt,
                          sheets_er_konfigurert, slett_prosjekt,
                          hent_kontakter, lagre_kontakter,
@@ -415,6 +415,8 @@ if st.session_state.get("side", "hjem") == "hjem":
                         last_prosjekt(proj)
                         if st.session_state.get("_kalkyle_type") == "manuell":
                             st.session_state["side"] = "manuell_kalkyle"
+                        elif st.session_state.get("_kalkyle_type") == "rammepris":
+                            st.session_state["side"] = "rammepris_kalkyle"
                         else:
                             st.session_state["side"] = "kalkyle"
                         st.rerun()
@@ -502,6 +504,8 @@ if st.session_state.get("side", "hjem") == "hjem":
                         last_prosjekt(proj)
                         if st.session_state.get("_kalkyle_type") == "manuell":
                             st.session_state["side"] = "manuell_kalkyle"
+                        elif st.session_state.get("_kalkyle_type") == "rammepris":
+                            st.session_state["side"] = "rammepris_kalkyle"
                         else:
                             st.session_state["side"] = "kalkyle"
                         st.rerun()
@@ -564,7 +568,7 @@ if st.session_state.get("side") == "velg_kalkyle_type":
 
     st.divider()
 
-    _vk1, _vk2 = st.columns(2)
+    _vk1, _vk2, _vk3 = st.columns(3)
     with _vk1:
         st.markdown("#### Bad / WC / Vaskerom")
         st.caption("Automatisk kalkyle med rommål, flisarbeider og tømrerarbeider.")
@@ -589,6 +593,18 @@ if st.session_state.get("side") == "velg_kalkyle_type":
             st.session_state.autentisert = autentisert
             st.session_state.bruker = bruker
             st.session_state["side"] = "manuell_kalkyle"
+            st.rerun()
+    with _vk3:
+        st.markdown("#### Rammepris")
+        st.caption("Fast pris per størrelseskategori med avkryssing av hva som er inkludert.")
+        if st.button("Rammepris", use_container_width=True, type="primary"):
+            autentisert = st.session_state.get("autentisert")
+            bruker = st.session_state.get("bruker")
+            for nk in list(st.session_state.keys()):
+                del st.session_state[nk]
+            st.session_state.autentisert = autentisert
+            st.session_state.bruker = bruker
+            st.session_state["side"] = "rammepris_kalkyle"
             st.rerun()
 
     st.divider()
@@ -862,6 +878,202 @@ if st.session_state.get("side") == "manuell_kalkyle":
         st.rerun()
 
     st.stop()
+
+# ===================================================================
+# RAMMEPRIS KALKYLE (side == "rammepris_kalkyle")
+# ===================================================================
+if st.session_state.get("side") == "rammepris_kalkyle":
+    if _logo.exists():
+        col1, col2, col3 = st.columns([1, 1, 1])
+        with col2:
+            st.image(str(_logo), use_container_width=True)
+    st.markdown(
+        "<h2 style='text-align:center; color:#555; margin-top:0'>Rammepris kalkyle</h2>",
+        unsafe_allow_html=True,
+    )
+
+    # Prosjektadresse
+    st.text_input("Prosjektadresse", placeholder="F.eks. Storgata 1, 0570 Oslo", key="rp_adresse")
+
+    st.divider()
+    st.subheader("Badestørrelse og pris")
+    st.radio(
+        "Velg kategori",
+        ["Bad 1–6 kvm", "Bad 6–10 kvm"],
+        key="rp_kat",
+        horizontal=True,
+    )
+    rp_kat = st.session_state.get("rp_kat", "Bad 1–6 kvm")
+    kategori = "liten" if "1–6" in rp_kat else "stor"
+
+    _rp_pris_default = RAMMEPRIS["liten_eks_mva"] if kategori == "liten" else RAMMEPRIS["stor_eks_mva"]
+    pris_eks = st.number_input(
+        "Rammepris eks. mva (kr)",
+        min_value=0,
+        value=int(st.session_state.get("_rp_pris_eks", _rp_pris_default)),
+        step=1000,
+        key="rp_pris_eks",
+    )
+
+    st.divider()
+    st.subheader("Inkludert i prisen")
+    st.caption("Huk av hva som er inkludert – dette vises i beskrivelsen og på PDF-en.")
+
+    inkludert_valg = RAMMEPRIS["inkludert_valg"]
+    halvt = (len(inkludert_valg) + 1) // 2
+    _rp_k1, _rp_k2 = st.columns(2)
+    valgte_poster = []
+    for i, valg in enumerate(inkludert_valg):
+        kol = _rp_k1 if i < halvt else _rp_k2
+        with kol:
+            st.checkbox(valg, key=f"rp_inkl_{i}")
+        if st.session_state.get(f"rp_inkl_{i}", False):
+            valgte_poster.append(valg)
+
+    # Beregninger
+    subtotal = pris_eks
+    mva = round(subtotal * MVA_SATS)
+    total_inkl = subtotal + mva
+
+    st.divider()
+    _, _rp_total_kol = st.columns([2, 2])
+    with _rp_total_kol:
+        st.markdown(f"**Rammepris eks. mva:** {fmt(subtotal)} kr")
+        st.markdown(f"**MVA 25%:** {fmt(mva)} kr")
+        st.markdown(f"### Total inkl. mva: {fmt(total_inkl)} kr")
+
+    # Lagre _-prefiks for prosjektlagring
+    st.session_state["_adresse"] = st.session_state.get("rp_adresse", "")
+    st.session_state["_kalkyle_type"] = "rammepris"
+    st.session_state["_rp_kat"] = rp_kat
+    st.session_state["_rp_pris_eks"] = pris_eks
+    for i in range(len(inkludert_valg)):
+        st.session_state[f"_rp_inkl_{i}"] = st.session_state.get(f"rp_inkl_{i}", False)
+
+    dato = datetime.date.today().strftime("%d.%m.%Y")
+    rp_eksport_data = {
+        "kalkyle_type": "rammepris",
+        "adresse": st.session_state.get("rp_adresse", ""),
+        "dato": dato,
+        "rp_kategori": kategori,
+        "inkludert": valgte_poster,
+        "subtotal": subtotal,
+        "mva": mva,
+        "total_inkl": total_inkl,
+    }
+    st.session_state["_eksport_data"] = rp_eksport_data
+
+    # Eksport
+    st.divider()
+    st.subheader("Eksporter")
+    rp_filnavn = f"rammepris_{trygt_filnavn(st.session_state.get('rp_adresse', 'tilbud'))}_{datetime.date.today()}"
+    st.download_button(
+        "Last ned PDF", generer_rammepris_pdf(rp_eksport_data),
+        f"{rp_filnavn}.pdf", "application/pdf", use_container_width=True,
+    )
+
+    # E-post
+    rp_har_smtp = hasattr(st, "secrets") and "smtp" in st.secrets
+    if rp_har_smtp:
+        st.divider()
+        st.subheader("Send på e-post")
+        rp_adresse_val = st.session_state.get("rp_adresse", "")
+        rp_epost_navn = st.text_input(
+            "Kalkylenavn i e-post", key="rp_epost_navn",
+            value=f"Rammepris – {rp_adresse_val}" if rp_adresse_val else "Rammepris",
+        )
+        st.markdown("**Hurtigsending:**")
+        _rp_ec1, _rp_ec2 = st.columns(2)
+        with _rp_ec1:
+            rp_send_christian = st.button("Send til Christian", use_container_width=True, key="rp_send_chr")
+        with _rp_ec2:
+            rp_send_mariann = st.button("Send til Mari-ann", use_container_width=True, key="rp_send_mar")
+
+        if rp_send_christian or rp_send_mariann:
+            rp_hurtig_mottaker = "christian@sostreneamundsen.no" if rp_send_christian else "ma@sostreneamundsen.no"
+            rp_hurtig_navn = "Christian" if rp_send_christian else "Mari-ann"
+            try:
+                smtp_config = {
+                    "host": st.secrets["smtp"]["host"],
+                    "port": int(st.secrets["smtp"]["port"]),
+                    "bruker": st.secrets["smtp"]["bruker"],
+                    "passord": st.secrets["smtp"]["passord"],
+                }
+                brodtekst = (
+                    f"Hei,\n\nVedlagt finner du {rp_epost_navn.lower()}.\n"
+                    f"Total inkl. mva: {fmt(total_inkl)} kr\n\n"
+                    f"Med vennlig hilsen\n{FIRMA['navn']}\n{FIRMA['telefon']}\n{FIRMA['epost']}"
+                )
+                send_epost(
+                    rp_hurtig_mottaker, rp_epost_navn, brodtekst,
+                    [(f"{rp_filnavn}.pdf", generer_rammepris_pdf(rp_eksport_data), "application/pdf")],
+                    smtp_config,
+                )
+                st.success(f"Sendt til {rp_hurtig_navn} ({rp_hurtig_mottaker})!")
+            except Exception as e:
+                st.error(f"Kunne ikke sende: {e}")
+
+        st.divider()
+        st.markdown("**Eller send til annen mottaker:**")
+        rp_epost_mottaker = st.text_input("Mottakers e-postadresse", key="rp_epost_mottaker",
+                                           placeholder="kunde@eksempel.no")
+        if st.button("Send på e-post", use_container_width=True, type="primary", key="rp_send_epost"):
+            if not rp_epost_mottaker or "@" not in rp_epost_mottaker:
+                st.error("Vennligst fyll inn en gyldig e-postadresse.")
+            else:
+                try:
+                    smtp_config = {
+                        "host": st.secrets["smtp"]["host"],
+                        "port": int(st.secrets["smtp"]["port"]),
+                        "bruker": st.secrets["smtp"]["bruker"],
+                        "passord": st.secrets["smtp"]["passord"],
+                    }
+                    brodtekst = (
+                        f"Hei,\n\nVedlagt finner du {rp_epost_navn.lower()}.\n"
+                        f"Total inkl. mva: {fmt(total_inkl)} kr\n\n"
+                        f"Med vennlig hilsen\n{FIRMA['navn']}\n{FIRMA['telefon']}\n{FIRMA['epost']}"
+                    )
+                    send_epost(
+                        rp_epost_mottaker, rp_epost_navn, brodtekst,
+                        [(f"{rp_filnavn}.pdf", generer_rammepris_pdf(rp_eksport_data), "application/pdf")],
+                        smtp_config,
+                    )
+                    st.success(f"Sendt til {rp_epost_mottaker}!")
+                except Exception as e:
+                    st.error(f"Kunne ikke sende: {e}")
+
+    # Lagre som prosjekt
+    if sheets_er_konfigurert():
+        st.divider()
+        rp_har_prosjekt = bool(st.session_state.get("prosjekt_id"))
+        if rp_har_prosjekt:
+            if st.button("Lagre kalkyle", use_container_width=True, type="primary", key="rp_lagre"):
+                try:
+                    pid = st.session_state["prosjekt_id"]
+                    oppdater_prosjekt(pid, st.session_state.bruker)
+                    lagre_dokument(pid, "Rammepris", generer_rammepris_pdf(rp_eksport_data))
+                    st.success("Kalkyle lagret!")
+                    st.rerun()
+                except Exception as e:
+                    st.error(f"Kunne ikke lagre: {e}")
+        if st.button("Lagre som nytt prosjekt", use_container_width=True,
+                     type="secondary" if rp_har_prosjekt else "primary", key="rp_lagre_ny"):
+            try:
+                pid = lagre_prosjekt(st.session_state.bruker)
+                st.session_state["prosjekt_id"] = pid
+                lagre_dokument(pid, "Rammepris", generer_rammepris_pdf(rp_eksport_data))
+                st.success(f"Nytt prosjekt lagret! (ID: {pid})")
+                st.rerun()
+            except Exception as e:
+                st.error(f"Kunne ikke lagre: {e}")
+
+    st.divider()
+    if st.button("← Tilbake til hjem", use_container_width=False, key="rp_tilbake"):
+        st.session_state["side"] = "hjem"
+        st.rerun()
+
+    st.stop()
+
 
 # ===================================================================
 # TIMELISTE (side == "timeliste")

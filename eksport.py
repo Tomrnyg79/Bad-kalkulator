@@ -16,7 +16,7 @@ from openpyxl import Workbook
 from openpyxl.styles import Font, Alignment, Border, Side, PatternFill
 
 import pathlib
-from priser import FIRMA, MVA_SATS, TOMRER
+from priser import FIRMA, MVA_SATS, TOMRER, RAMMEPRIS
 
 _LOGO = pathlib.Path(__file__).parent / "unnamed.jpg"
 
@@ -174,6 +174,106 @@ def generer_pdf(data):
 
     pdf.set_font("Helvetica", "B", 12)
     pdf.cell(tom_b, 8, "")
+    pdf.cell(label_w, 8, "Total inkl. mva:", align="R")
+    pdf.cell(val_w, 8, f"{fmt(total_inkl)} kr", align="R")
+
+    return bytes(pdf.output())
+
+
+# ---------------------------------------------------------------------------
+# Rammepris PDF
+# ---------------------------------------------------------------------------
+
+def generer_rammepris_pdf(data):
+    """Generer PDF for rammepris – viser inkluderte poster som liste, ingen enhetspriser."""
+    pdf = FPDF()
+    pdf.add_page()
+    pdf.set_auto_page_break(auto=True, margin=15)
+
+    # Firmaheader med logo
+    pdf.set_font("Helvetica", "B", 20)
+    if _LOGO.exists():
+        pdf.image(str(_LOGO), x=10, y=10, w=50)
+        pdf.set_y(10)
+        pdf.cell(55)
+    pdf.cell(0, 10, FIRMA["navn"], new_x="LMARGIN", new_y="NEXT")
+    if _LOGO.exists():
+        pdf.set_x(65)
+    pdf.set_font("Helvetica", "", 9)
+    pdf.cell(0, 4, f"Org.nr: {FIRMA['orgnr']}  |  Tlf: {FIRMA['telefon']}", new_x="LMARGIN", new_y="NEXT")
+    if _LOGO.exists():
+        pdf.set_x(65)
+    pdf.cell(0, 4, f"{FIRMA['adresse']}  |  {FIRMA['epost']}", new_x="LMARGIN", new_y="NEXT")
+    if _LOGO.exists():
+        pdf.set_y(max(pdf.get_y(), 40))
+
+    pdf.ln(3)
+    pdf.set_draw_color(180, 180, 180)
+    pdf.line(10, pdf.get_y(), 200, pdf.get_y())
+    pdf.ln(6)
+
+    # Tittel
+    pdf.set_font("Helvetica", "B", 18)
+    pdf.cell(0, 10, "RAMMEPRIS TILBUD", new_x="LMARGIN", new_y="NEXT")
+    pdf.ln(4)
+
+    # Prosjektinfo
+    kategori_tekst = "1-6 m\u00b2" if data.get("rp_kategori") == "liten" else "6-10 m\u00b2"
+    felter = [
+        ("Prosjekt:", data.get("adresse", "")),
+        ("Dato:", data.get("dato", "")),
+        ("Badestørrelse:", kategori_tekst),
+    ]
+    for etikett, verdi in felter:
+        pdf.set_font("Helvetica", "B", 10)
+        pdf.cell(35, 6, etikett)
+        pdf.set_font("Helvetica", "", 10)
+        pdf.cell(0, 6, verdi, new_x="LMARGIN", new_y="NEXT")
+
+    pdf.ln(6)
+
+    # Inkludert i prisen
+    inkludert = data.get("inkludert", [])
+    if inkludert:
+        pdf.set_font("Helvetica", "B", 12)
+        pdf.cell(0, 8, "Inkludert i prisen:", new_x="LMARGIN", new_y="NEXT")
+        pdf.ln(2)
+        pdf.set_font("Helvetica", "", 10)
+        for post in inkludert:
+            pdf.cell(8, 6, "-")
+            pdf.cell(0, 6, post, new_x="LMARGIN", new_y="NEXT")
+        pdf.ln(6)
+
+    # Totaler
+    subtotal = data.get("subtotal", 0)
+    mva = data.get("mva", 0)
+    total_inkl = data.get("total_inkl", 0)
+
+    label_w = 60
+    val_w = 40
+    left = 200 - label_w - val_w
+
+    pdf.set_draw_color(180, 180, 180)
+    pdf.line(10, pdf.get_y(), 200, pdf.get_y())
+    pdf.ln(4)
+
+    pdf.set_font("Helvetica", "", 11)
+    pdf.set_x(left)
+    pdf.cell(label_w, 7, "Sum eks. mva:", align="R")
+    pdf.cell(val_w, 7, f"{fmt(subtotal)} kr", align="R")
+    pdf.ln()
+
+    pdf.set_x(left)
+    pdf.cell(label_w, 7, "MVA 25%:", align="R")
+    pdf.cell(val_w, 7, f"{fmt(mva)} kr", align="R")
+    pdf.ln()
+
+    pdf.set_draw_color(0, 0, 0)
+    pdf.line(left, pdf.get_y(), 200, pdf.get_y())
+    pdf.ln(1)
+
+    pdf.set_font("Helvetica", "B", 13)
+    pdf.set_x(left)
     pdf.cell(label_w, 8, "Total inkl. mva:", align="R")
     pdf.cell(val_w, 8, f"{fmt(total_inkl)} kr", align="R")
 

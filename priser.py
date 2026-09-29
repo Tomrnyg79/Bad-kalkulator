@@ -44,6 +44,37 @@ EPOXY_VALG = {
     "Stor (6 000 kr)": 6000,
 }
 
+# --- Rammepris ---
+RAMMEPRIS = {
+    "liten_eks_mva": 85000,   # Bad 1–6 kvm, eks. mva
+    "stor_eks_mva": 120000,   # Bad 6–10 kvm, eks. mva
+    "inkludert_valg": [
+        "Riving og bortkjøring av avfall",
+        "Membran gulv",
+        "Membran vegger",
+        "Gulvstøp",
+        "Flislegging gulv",
+        "Flislegging vegger",
+        "Sokkelflis",
+        "Nytt sluk",
+        "Silikonering",
+        "Nedforing / lekting tak",
+        "Gips tak",
+        "Tømrerarbeider vegger",
+        "Isolering vegger",
+        "Isolering tak",
+        "Ny innerdør",
+        "Nye lister",
+        "Gulvvarme (elektrisk)",
+        "Montering toalett",
+        "Montering servant / servantskap",
+        "Montering dusjhjørne / dusjkabinett",
+        "Montering badekar",
+        "Nisje",
+        "Dokumentasjon / FDV",
+    ],
+}
+
 # --- Toemrerarbeid ---
 TOMRER = {
     "isolering_standard": 220,
